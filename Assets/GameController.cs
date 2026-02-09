@@ -11,11 +11,33 @@ public class GameController : MonoBehaviour
     public List<Room> Rooms;
     public Room ActiveRoom;
 
+    public List<Camp> Camps;
+    public Camp LastCamp;
+
     private void Awake()
     {
         instance = this;
         Rooms = new List<Room>();
+        Camps = new List<Camp>();
         mainCam = camParent.transform.Find("Main Camera").GetComponent<Camera>();
+    }
+    private void Start()
+    {
+        foreach (var i in Rooms)
+            i.gameObject.SetActive(false);
+        ActiveRoom.gameObject.SetActive(true);
+    }
+    public void ActivateRoom(Room des)
+    {
+        ActiveRoom.Deactivate();
+        ClearBullets();
+        ActiveRoom = des;
+        des.Activate();
+    }
+
+    public void ClearBullets()
+    {
+
     }
 
     // Update is called once per frame

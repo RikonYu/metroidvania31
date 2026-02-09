@@ -12,7 +12,7 @@ public class Room : MonoBehaviour
     private Camera mainCam;
     private Transform playerTransform;
 
-    void Start()
+    void Awake()
     {
         GameController.instance.Rooms.Add(this);
 
@@ -20,8 +20,13 @@ public class Room : MonoBehaviour
         roomBounds.center += transform.position;
 
     }
-
-    void LateUpdate()
+    public void Deactivate()
     {
+
+    }
+
+    public void Activate()
+    {
+
     }
 }
