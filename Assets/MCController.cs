@@ -30,6 +30,12 @@ public class MCController : MonoBehaviour
     [SerializeField] private float groundCheckRadius = 0.2f;
     [SerializeField] private LayerMask groundLayer;
 
+    [Header("Respawn System")]
+    [Tooltip("复活时相对于地面接触点的偏移量")]
+    [SerializeField] private Vector2 respawnOffset = new Vector2(0f, 0.5f);
+    [Tooltip("判定为平坦表面的法线阈值")]
+    [SerializeField] private float safeSlopeThreshold = 0.7f;
+
     private Rigidbody2D rb;
     private float horizontalInput;
     private bool isGrounded;
@@ -38,12 +44,14 @@ public class MCController : MonoBehaviour
     private float jumpBufferCounter;
     private bool isStunned;
     private float lastVerticalVelocity;
+    private Vector3 lastSafePosition;
 
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
         rb.freezeRotation = true;
         rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
+        lastSafePosition = transform.position;
     }
 
     void Update()
@@ -81,6 +89,7 @@ public class MCController : MonoBehaviour
     void FixedUpdate()
     {
         CheckGround();
+        UpdateSafePosition();
 
         if (isStunned)
         {
@@ -96,10 +105,8 @@ public class MCController : MonoBehaviour
     private void Move()
     {
         float targetSpeed = horizontalInput * moveSpeed;
-
         float speedDif = targetSpeed - rb.velocity.x;
         float accelRate = (Mathf.Abs(targetSpeed) > 0.01f) ? acceleration : decceleration;
-
         float movement = speedDif * accelRate * Time.fixedDeltaTime;
 
         rb.velocity = new Vector2(rb.velocity.x + movement, rb.velocity.y);
@@ -109,7 +116,6 @@ public class MCController : MonoBehaviour
     {
         rb.velocity = new Vector2(rb.velocity.x, 0);
         rb.AddForce(Vector2.up * jumpForce, ForceMode2D.Impulse);
-
         jumpBufferCounter = 0f;
         coyoteTimeCounter = 0f;
     }
@@ -151,6 +157,29 @@ public class MCController : MonoBehaviour
         }
     }
 
+    private void UpdateSafePosition()
+    {
+        if (isGrounded && rb.velocity.y <= 0.1f)
+        {
+            RaycastHit2D hit = Physics2D.Raycast(groundCheck.position, Vector2.down, groundCheckRadius * 2f, groundLayer);
+
+            if (hit.collider != null)
+            {
+                if (hit.normal.y > safeSlopeThreshold)
+                {
+                    lastSafePosition = hit.point + respawnOffset;
+                }
+            }
+        }
+    }
+
+    public void Respawn()
+    {
+        rb.velocity = Vector2.zero;
+        isStunned = false;
+        transform.position = lastSafePosition;
+    }
+
     private void OnLand()
     {
         if (lastVerticalVelocity <= hardLandingThreshold)
@@ -172,6 +201,9 @@ public class MCController : MonoBehaviour
         {
             Gizmos.color = isGrounded ? Color.green : Color.red;
             Gizmos.DrawWireSphere(groundCheck.position, groundCheckRadius);
+
+            Gizmos.color = Color.yellow;
+            Gizmos.DrawLine(groundCheck.position, groundCheck.position + Vector3.down * groundCheckRadius * 2f);
         }
     }
 }
