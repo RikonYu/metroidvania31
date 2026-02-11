@@ -37,7 +37,9 @@ public class GameController : MonoBehaviour
 
     public void ClearBullets()
     {
-
+        var bullets = Object.FindObjectsOfType<Bullet>();
+        foreach (var i in bullets)
+            Destroy(i.gameObject);
     }
 
     // Update is called once per frame
