@@ -45,6 +45,20 @@ public class GameController : MonoBehaviour
     {
         
     }
+
+    public void Die(bool isDropped)
+    {
+        UIController.instance.ShowLose();
+        if (isDropped)
+        {
+
+        }
+        else
+        {
+            
+        }
+        mc.Respawn(isDropped);
+    }
     private void LateUpdate()
     {
 

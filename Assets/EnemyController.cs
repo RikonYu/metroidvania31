@@ -11,13 +11,21 @@ public class EnemyController : MonoBehaviour
     public GameObject Waypoints;
     public WaypointMaster wm;
     protected Vector3 StartPos;
+    public bool IsDead;
     private void Awake()
     {
         StartPos = transform.position;
+        transform.parent.gameObject.GetComponent<Room>().Enemies.Add(this);
     }
     // Start is called before the first frame update
     void Start()
     {
+        if (IsDead)
+        {
+            gameObject.SetActive(false);
+            return;
+        }
+
         CurrentHP = MaxHP;
         transform.position = StartPos;
         wm = Waypoints.GetComponent<WaypointMaster>();
@@ -34,6 +42,11 @@ public class EnemyController : MonoBehaviour
 
     protected virtual void Die()
     {
-        Destroy(gameObject);
+        IsDead = true;
+        gameObject.SetActive(false);
+    }
+    public void Hurt(float dmg)
+    {
+        CurrentHP -= dmg;
     }
 }

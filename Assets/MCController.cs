@@ -6,6 +6,10 @@ using UnityEngine;
 [RequireComponent(typeof(BoxCollider2D))]
 public class MCController : MonoBehaviour
 {
+    public float MaxHealth, CurrentHealth;
+    public GameObject MyBullet;
+    public float FireCoolDown;
+    private float firecd;
     [Header("Movement")]
     [SerializeField] private float moveSpeed = 8f;
     [SerializeField] private float acceleration = 10f;
@@ -36,6 +40,8 @@ public class MCController : MonoBehaviour
     [Tooltip("判定为平坦表面的法线阈值")]
     [SerializeField] private float safeSlopeThreshold = 0.7f;
 
+    
+
     private Rigidbody2D rb;
     private float horizontalInput;
     private bool isGrounded;
@@ -52,6 +58,7 @@ public class MCController : MonoBehaviour
         rb.freezeRotation = true;
         rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
         lastSafePosition = transform.position;
+        firecd = 0f;
     }
 
     void Update()
@@ -67,6 +74,19 @@ public class MCController : MonoBehaviour
         else
         {
             jumpBufferCounter -= Time.deltaTime;
+        }
+        firecd -= Time.deltaTime;
+        if (Input.GetMouseButton(0))
+        {
+            if (firecd <= 0f)
+            {
+                firecd = FireCoolDown;
+                var x = Instantiate(MyBullet, transform.position, Quaternion.identity);
+                Vector3 screenPosition = Input.mousePosition;
+                Vector3 worldPosition = Camera.main.ScreenToWorldPoint(screenPosition);
+                worldPosition.z = 0;
+                x.GetComponent<Bullet>().Init(false, worldPosition - transform.position);
+            }
         }
 
         if (isGrounded)
@@ -173,11 +193,18 @@ public class MCController : MonoBehaviour
         }
     }
 
-    public void Respawn()
+    public void Respawn(bool isDropped)
     {
+        firecd = 0f;
         rb.velocity = Vector2.zero;
         isStunned = false;
-        transform.position = lastSafePosition;
+        if (isDropped)
+            transform.position = lastSafePosition;
+        else
+        {
+            CurrentHealth = MaxHealth;
+            transform.position = GameController.instance.LastCamp.transform.position;
+        }
     }
 
     private void OnLand()
@@ -186,6 +213,13 @@ public class MCController : MonoBehaviour
         {
             StartCoroutine(HardLandingStun());
         }
+    }
+
+    public void Hurt(float dmg)
+    {
+        CurrentHealth -= dmg;
+        if (CurrentHealth <= 0f)
+            GameController.instance.Die(false);
     }
 
     IEnumerator HardLandingStun()
