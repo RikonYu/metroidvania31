@@ -9,6 +9,7 @@ public class Room : MonoBehaviour
     public List<EnemyController> Enemies;
 
     public Bounds roomBounds;
+    public bool IsBossRoom;
     private Camera mainCam;
     private Transform playerTransform;
 

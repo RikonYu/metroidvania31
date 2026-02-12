@@ -59,6 +59,9 @@ public class MCController : MonoBehaviour
         rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
         lastSafePosition = transform.position;
         firecd = 0f;
+        CurrentHealth = MaxHealth;
+        UIController.instance.SetHP(CurrentHealth, MaxHealth);
+        
     }
 
     void Update()
@@ -204,6 +207,8 @@ public class MCController : MonoBehaviour
         {
             CurrentHealth = MaxHealth;
             transform.position = GameController.instance.LastCamp.transform.position;
+
+            UIController.instance.SetHP(CurrentHealth, MaxHealth);
         }
     }
 
@@ -218,6 +223,8 @@ public class MCController : MonoBehaviour
     public void Hurt(float dmg)
     {
         CurrentHealth -= dmg;
+        if (CurrentHealth <= 0f) CurrentHealth = 0f;
+        UIController.instance.SetHP(CurrentHealth, MaxHealth);
         if (CurrentHealth <= 0f)
             GameController.instance.Die(false);
     }

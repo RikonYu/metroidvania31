@@ -36,7 +36,7 @@ public class Bullet : MonoBehaviour
         {
             collision.gameObject.GetComponent<EnemyController>().Hurt(this.Damage);
         }
-        else
+        else if (collision.gameObject.GetComponent<MCController>() != null)
         {
             collision.gameObject.GetComponent<MCController>().Hurt(this.Damage);
         }
