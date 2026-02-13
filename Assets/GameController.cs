@@ -13,12 +13,14 @@ public class GameController : MonoBehaviour
 
     public List<Camp> Camps;
     public Camp LastCamp;
+    public List<EnemyController> AllEnemies;
 
     private void Awake()
     {
         instance = this;
         Rooms = new List<Room>();
         Camps = new List<Camp>();
+        AllEnemies = new List<EnemyController>();
         mainCam = camParent.transform.Find("Main Camera").GetComponent<Camera>();
     }
     private void Start()
@@ -47,18 +49,38 @@ public class GameController : MonoBehaviour
     {
         
     }
-
+    public void ResetGameState()
+    {
+        foreach(var i in AllEnemies)
+            if (!i.IsBoss)
+            {
+                i.gameObject.SetActive(true);
+                i.Respawn();
+            }
+        mc.CurrentHealth = mc.MaxHealth;
+    }
+    public void ResetAggro()
+    {
+        foreach (var i in AllEnemies)
+            if (i.gameObject.activeSelf == true)
+            {
+                i.ResetAggro();
+            }
+            
+    }
     public void Die(bool isDropped)
     {
         UIController.instance.ShowLose();
+        ClearBullets();
         if (isDropped)
         {
 
         }
         else
         {
-            
+            ResetGameState();
         }
+        ResetAggro();
         mc.Respawn(isDropped);
     }
     private void LateUpdate()

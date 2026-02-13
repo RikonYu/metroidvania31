@@ -49,6 +49,12 @@ public class Camp : MonoBehaviour
         }
     }
 
+    public void Interact()
+    {
+        GameController.instance.LastCamp = this;
+
+    }
+
     private void OnTriggerExit2D(Collider2D other)
     {
         if (other.CompareTag("Player") || other.GetComponent<MCController>() != null)

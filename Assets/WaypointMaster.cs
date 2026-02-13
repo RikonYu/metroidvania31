@@ -6,7 +6,6 @@ public class WaypointMaster : MonoBehaviour
     public Color pathColor = Color.cyan;
     public bool loop = true;
 
-    // 获取所有子物体中的路径点
     public List<Transform> GetWaypoints()
     {
         List<Transform> points = new List<Transform>();
@@ -27,7 +26,6 @@ public class WaypointMaster : MonoBehaviour
         {
             Gizmos.DrawSphere(points[i].position, 0.2f);
 
-            // 绘制线
             if (i < points.Count - 1)
             {
                 Gizmos.DrawLine(points[i].position, points[i + 1].position);

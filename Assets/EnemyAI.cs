@@ -5,7 +5,9 @@ using UnityEngine;
 public enum EnemyState
 {
     Patrol,
+    Alert,
     Chase,
+    PrepareAttack,
     Engage,
     Search
 }
@@ -18,45 +20,33 @@ public class EnemyAI : MonoBehaviour
 
     [Header("Phase Settings")]
     public int StageNum;
-
-    [Tooltip("当前行为阶段（由HP决定）")]
     public int currentPhase;
-
-    [Tooltip("各阶段HP百分比阈值 (1.0 -> 0.0)")]
     public List<float> Portion = new List<float>() { 1.0f };
 
     [Header("AI State")]
     [SerializeField]
-    [Tooltip("当前AI行为状态")]
     private EnemyState currentState = EnemyState.Patrol;
 
     [Header("Detection Settings")]
     [Range(0, 360)]
-    [Tooltip("索敌扇形角度")]
     public float viewAngle = 90f;
-
-    [Tooltip("索敌视线半径")]
     public float viewRadius = 10f;
-
-    [Tooltip("最大追击距离 (超过此距离放弃追击)")]
     public float chaseRadius = 15f;
-
-    [Tooltip("视线遮挡层级 (通常选择Ground和Obstacle)")]
     public LayerMask obstacleMask;
 
-    [Header("Combat Settings")]
-    [Tooltip("攻击触发距离")]
-    public float attackRange = 1.5f;
+    [Header("Transition Settings")]
+    public float alertDuration = 0.8f;
+    private float alertTimer;
+    public float prepareAttackDuration = 0.5f;
+    private float prepareAttackTimer;
 
-    [Tooltip("攻击冷却时间 (秒)")]
+    [Header("Combat Settings")]
+    public float attackRange = 1.5f;
     public float attackCooldown = 2.0f;
     private float lastAttackTime;
 
     [Header("Patrol Settings")]
-    [Tooltip("到达路点的判定距离阈值")]
     public float waypointTolerance = 0.5f;
-
-    [Tooltip("丢失目标后的原地等待/搜索时间")]
     public float searchWaitTime = 2.0f;
     private float searchTimer;
     private int currentWaypointIndex = 0;
@@ -94,14 +84,20 @@ public class EnemyAI : MonoBehaviour
         }
 
         if (playerTransform == null) return;
-        print($"currentstate: {currentState}");
+
         switch (currentState)
         {
             case EnemyState.Patrol:
                 UpdatePatrol();
                 break;
+            case EnemyState.Alert:
+                UpdateAlert();
+                break;
             case EnemyState.Chase:
                 UpdateChase();
+                break;
+            case EnemyState.PrepareAttack:
+                UpdatePrepareAttack();
                 break;
             case EnemyState.Engage:
                 UpdateEngage();
@@ -117,18 +113,34 @@ public class EnemyAI : MonoBehaviour
         MoveCharacter(moveInput);
     }
 
+    public void ResetToPatrol()
+    {
+        currentState = EnemyState.Patrol;
+        alertTimer = 0;
+        prepareAttackTimer = 0;
+        searchTimer = 0;
+        moveInput = Vector2.zero;
+        if (rb != null) rb.velocity = Vector2.zero;
+
+        if (waypoints != null && waypoints.Count > 0)
+        {
+            currentWaypointIndex = GetClosestWaypointIndex();
+        }
+    }
+
     void UpdatePatrol()
     {
         if (CanSeePlayer())
         {
-            currentState = EnemyState.Chase;
+            currentState = EnemyState.Alert;
+            alertTimer = alertDuration;
+            moveInput = Vector2.zero;
             return;
         }
 
         if (waypoints == null || waypoints.Count == 0) return;
 
         Transform targetPoint = waypoints[currentWaypointIndex];
-
         CalculateMovement(targetPoint.position);
 
         float distToWaypoint = controller.IsFlying
@@ -138,6 +150,18 @@ public class EnemyAI : MonoBehaviour
         if (distToWaypoint < waypointTolerance)
         {
             currentWaypointIndex = (currentWaypointIndex + 1) % waypoints.Count;
+        }
+    }
+
+    void UpdateAlert()
+    {
+        moveInput = Vector2.zero;
+        FaceTarget(playerTransform.position);
+        alertTimer -= Time.deltaTime;
+
+        if (alertTimer <= 0)
+        {
+            currentState = EnemyState.Chase;
         }
     }
 
@@ -155,12 +179,25 @@ public class EnemyAI : MonoBehaviour
 
         if (distToPlayer <= attackRange)
         {
-            currentState = EnemyState.Engage;
+            currentState = EnemyState.PrepareAttack;
+            prepareAttackTimer = prepareAttackDuration;
             moveInput = Vector2.zero;
             return;
         }
 
         CalculateMovement(playerTransform.position);
+    }
+
+    void UpdatePrepareAttack()
+    {
+        moveInput = Vector2.zero;
+        FaceTarget(playerTransform.position);
+        prepareAttackTimer -= Time.deltaTime;
+
+        if (prepareAttackTimer <= 0)
+        {
+            currentState = EnemyState.Engage;
+        }
     }
 
     void UpdateEngage()
@@ -187,7 +224,9 @@ public class EnemyAI : MonoBehaviour
     {
         if (CanSeePlayer())
         {
-            currentState = EnemyState.Chase;
+            currentState = EnemyState.Alert;
+            alertTimer = alertDuration;
+            moveInput = Vector2.zero;
             return;
         }
 
@@ -248,7 +287,6 @@ public class EnemyAI : MonoBehaviour
 
     protected virtual void Attack()
     {
-
     }
 
     int GetClosestWaypointIndex()

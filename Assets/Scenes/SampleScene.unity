@@ -292,6 +292,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   HPLenUnit: 20
   HPParent: {fileID: 1690952453}
+  BossHPParent: {fileID: 1468024067}
 --- !u!114 &163889712
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3089,7 +3090,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1468024068
 RectTransform:
   m_ObjectHideFlags: 0
@@ -3219,6 +3220,7 @@ MonoBehaviour:
   ActiveRoom: {fileID: 1347026063}
   Camps: []
   LastCamp: {fileID: 0}
+  AllEnemies: []
 --- !u!4 &1902366875
 Transform:
   m_ObjectHideFlags: 0

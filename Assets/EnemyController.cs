@@ -11,11 +11,22 @@ public class EnemyController : MonoBehaviour
     public GameObject Waypoints;
     public WaypointMaster wm;
     protected Vector3 StartPos;
-    public bool IsDead;
+    bool IsDead;
+    public bool IsBoss;
+    EnemyAI AI;
     private void Awake()
     {
+        AI = gameObject.GetComponent<EnemyAI>();
         StartPos = transform.position;
+        wm = Waypoints.GetComponent<WaypointMaster>();
         transform.parent.gameObject.GetComponent<Room>().Enemies.Add(this);
+        GameController.instance.AllEnemies.Add(this);
+    }
+    public void Respawn()
+    {
+        IsDead = false;
+        CurrentHP = MaxHP;
+        transform.position = StartPos;
     }
     // Start is called before the first frame update
     void Start()
@@ -25,10 +36,11 @@ public class EnemyController : MonoBehaviour
             gameObject.SetActive(false);
             return;
         }
-
-        CurrentHP = MaxHP;
-        transform.position = StartPos;
-        wm = Waypoints.GetComponent<WaypointMaster>();
+        Respawn();
+    }
+    public void ResetAggro()
+    {
+        AI.ResetToPatrol();
     }
 
     // Update is called once per frame
