@@ -35,4 +35,13 @@ public class Utils
         func?.Invoke();
         yield return null;
     }
+
+    public static void SnapToGround(GameObject obj, float snapDistance, LayerMask groundLayer)
+    {
+        RaycastHit2D hit = Physics2D.Raycast(obj.transform.position, Vector2.down, snapDistance, groundLayer);
+        if (hit.collider != null)
+        {
+            obj.transform.position = new Vector3(hit.point.x, hit.point.y + obj.GetComponent<BoxCollider2D>().size.y / 2f, obj.transform.position.z);
+        }
+    }
 }

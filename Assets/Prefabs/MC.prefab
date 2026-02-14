@@ -48,6 +48,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fdbd221216c65ef41879828d462dfc53, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  MaxHealth: 0
+  CurrentHealth: 0
+  MyBullet: {fileID: 0}
+  FireCoolDown: 0
   moveSpeed: 8
   acceleration: 10
   decceleration: 10
@@ -64,6 +68,8 @@ MonoBehaviour:
   groundLayer:
     serializedVersion: 2
     m_Bits: 192
+  respawnOffset: {x: 0, y: 0.5}
+  safeSlopeThreshold: 0.7
 --- !u!61 &3961196849992836153
 BoxCollider2D:
   m_ObjectHideFlags: 0

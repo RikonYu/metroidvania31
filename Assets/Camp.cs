@@ -1,8 +1,9 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics.Tracing;
 using UnityEngine;
 
-public class Camp : MonoBehaviour
+public class Camp : Interactable
 {
     [Header("Settings")]
     [Tooltip("需要显示/隐藏的提示信息子物体")]
@@ -21,7 +22,7 @@ public class Camp : MonoBehaviour
             GameController.instance.Camps.Add(this);
         }
 
-        SnapToGround();
+        Utils.SnapToGround(gameObject, snapDistance, groundLayer);
 
         if (infoObject != null)
         {
@@ -29,16 +30,8 @@ public class Camp : MonoBehaviour
         }
     }
 
-    private void SnapToGround()
-    {
-        RaycastHit2D hit = Physics2D.Raycast(transform.position, Vector2.down, snapDistance, groundLayer);
-        if (hit.collider != null)
-        {
-            transform.position = new Vector3(hit.point.x, hit.point.y + GetComponent<BoxCollider2D>().size.y/2f, transform.position.z);
-        }
-    }
 
-    private void OnTriggerEnter2D(Collider2D other)
+    public override void OnTriggerEnter2D(Collider2D other)
     {
         if (other.CompareTag("Player") || other.GetComponent<MCController>() != null)
         {
@@ -47,12 +40,13 @@ public class Camp : MonoBehaviour
                 infoObject.SetActive(true);
             }
         }
+        base.OnTriggerEnter2D(other);
     }
 
-    public void Interact()
+    public override void Interact()
     {
         GameController.instance.LastCamp = this;
-
+        infoObject.SetActive(false);
     }
 
     private void OnTriggerExit2D(Collider2D other)
@@ -64,5 +58,7 @@ public class Camp : MonoBehaviour
                 infoObject.SetActive(false);
             }
         }
+        base.OnTriggerExit2D(other);
     }
+
 }

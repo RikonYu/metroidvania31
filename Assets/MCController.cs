@@ -39,7 +39,6 @@ public class MCController : MonoBehaviour
     [SerializeField] private Vector2 respawnOffset = new Vector2(0f, 0.5f);
     [Tooltip("判定为平坦表面的法线阈值")]
     [SerializeField] private float safeSlopeThreshold = 0.7f;
-
     
 
     private Rigidbody2D rb;
@@ -69,15 +68,18 @@ public class MCController : MonoBehaviour
         if (isStunned) return;
 
         horizontalInput = Input.GetAxisRaw("Horizontal");
-
+        if (Input.GetKeyDown(KeyCode.E))
+        {
+            GameController.instance.InteractingObject?.Interact();
+        }
         if (Input.GetKeyDown(KeyCode.W))
-        {
-            jumpBufferCounter = jumpBufferTime;
-        }
-        else
-        {
-            jumpBufferCounter -= Time.deltaTime;
-        }
+            {
+                jumpBufferCounter = jumpBufferTime;
+            }
+            else
+            {
+                jumpBufferCounter -= Time.deltaTime;
+            }
         firecd -= Time.deltaTime;
         if (Input.GetMouseButton(0))
         {

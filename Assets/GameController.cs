@@ -15,6 +15,8 @@ public class GameController : MonoBehaviour
     public Camp LastCamp;
     public List<EnemyController> AllEnemies;
 
+    public Interactable InteractingObject;
+
     private void Awake()
     {
         instance = this;
