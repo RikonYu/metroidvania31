@@ -49,7 +49,8 @@ public class Camp : Interactable
         infoObject.SetActive(false);
     }
 
-    private void OnTriggerExit2D(Collider2D other)
+     
+    public override void OnTriggerExit2D(Collider2D other)
     {
         if (other.CompareTag("Player") || other.GetComponent<MCController>() != null)
         {

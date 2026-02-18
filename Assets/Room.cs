@@ -19,11 +19,15 @@ public class Room : MonoBehaviour
         Enemies = new List<EnemyController>();
         roomBounds = Tiles.localBounds;
         roomBounds.center += transform.position;
-
+        print(roomBounds.size);
+    }
+    public Vector2 GetMinimapSize()
+    {
+        return Vector2Int.FloorToInt(roomBounds.size / Minimap.instance.cellSizeWorldUnits);
     }
     private void Start()
     {
-        
+
     }
     public void Deactivate()
     {

@@ -18,6 +18,8 @@ public class MCController : MonoBehaviour
     [Header("Jump & Gravity")]
     [SerializeField] private float jumpForce = 16f;
     [SerializeField] private float fallMultiplier = 2.5f;
+    [SerializeField] public float MaxJumpTime = 0.75f;
+    
     [SerializeField] private float lowJumpMultiplier = 4f;
     [SerializeField] private float maxFallSpeed = 25f;
 
@@ -50,6 +52,7 @@ public class MCController : MonoBehaviour
     private bool isStunned;
     private float lastVerticalVelocity;
     private Vector3 lastSafePosition;
+    private float jumpTimeCounter;
 
     void Start()
     {
@@ -60,7 +63,6 @@ public class MCController : MonoBehaviour
         firecd = 0f;
         CurrentHealth = MaxHealth;
         UIController.instance.SetHP(CurrentHealth, MaxHealth);
-        
     }
 
     void Update()
@@ -72,25 +74,39 @@ public class MCController : MonoBehaviour
         {
             GameController.instance.InteractingObject?.Interact();
         }
-        if (Input.GetKeyDown(KeyCode.W))
-            {
-                jumpBufferCounter = jumpBufferTime;
-            }
-            else
-            {
-                jumpBufferCounter -= Time.deltaTime;
-            }
+
+        if (Input.GetKey(KeyCode.W))
+        {
+            jumpBufferCounter = jumpBufferTime;
+        }
+        else
+        {
+            jumpBufferCounter -= Time.deltaTime;
+        }
+
+        if (rb.velocity.y > 0)
+        {
+            jumpTimeCounter += Time.deltaTime;
+        }
+        else
+        {
+            jumpTimeCounter = 0;
+        }
+
         firecd -= Time.deltaTime;
         if (Input.GetMouseButton(0))
         {
             if (firecd <= 0f)
             {
                 firecd = FireCoolDown;
-                var x = Instantiate(MyBullet, transform.position, Quaternion.identity);
-                Vector3 screenPosition = Input.mousePosition;
-                Vector3 worldPosition = Camera.main.ScreenToWorldPoint(screenPosition);
+                Vector3 worldPosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
                 worldPosition.z = 0;
-                x.GetComponent<Bullet>().Init(false, worldPosition - transform.position);
+                GameController.instance.FireBullet(
+                    MyBullet,
+                    transform.position,
+                    worldPosition,
+                    false
+                );
             }
         }
 
@@ -143,6 +159,7 @@ public class MCController : MonoBehaviour
         rb.AddForce(Vector2.up * jumpForce, ForceMode2D.Impulse);
         jumpBufferCounter = 0f;
         coyoteTimeCounter = 0f;
+        jumpTimeCounter = 0f;
     }
 
     private void ModifyPhysics()
@@ -156,9 +173,16 @@ public class MCController : MonoBehaviour
         {
             rb.gravityScale = fallMultiplier;
         }
-        else if (rb.velocity.y > 0 && !Input.GetKey(KeyCode.W))
+        else if (rb.velocity.y > 0)
         {
-            rb.gravityScale = lowJumpMultiplier;
+            if (!Input.GetKey(KeyCode.W) || jumpTimeCounter > MaxJumpTime)
+            {
+                rb.gravityScale = lowJumpMultiplier;
+            }
+            else
+            {
+                rb.gravityScale = 1f;
+            }
         }
         else
         {

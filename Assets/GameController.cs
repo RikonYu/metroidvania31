@@ -17,6 +17,11 @@ public class GameController : MonoBehaviour
 
     public Interactable InteractingObject;
 
+    private Dictionary<string, Queue<Bullet>> bulletPools = new Dictionary<string, Queue<Bullet>>();
+    private HashSet<Bullet> activeBullets = new HashSet<Bullet>();
+
+    [SerializeField] private Transform bulletContainer;
+
     private void Awake()
     {
         instance = this;
@@ -39,21 +44,14 @@ public class GameController : MonoBehaviour
         des.Activate();
     }
 
-    public void ClearBullets()
-    {
-        var bullets = Object.FindObjectsOfType<Bullet>();
-        foreach (var i in bullets)
-            Destroy(i.gameObject);
-    }
-
     // Update is called once per frame
     void Update()
     {
-        
+
     }
     public void ResetGameState()
     {
-        foreach(var i in AllEnemies)
+        foreach (var i in AllEnemies)
             if (!i.IsBoss)
             {
                 i.gameObject.SetActive(true);
@@ -68,7 +66,7 @@ public class GameController : MonoBehaviour
             {
                 i.ResetAggro();
             }
-            
+
     }
     public void Die(bool isDropped)
     {
@@ -102,5 +100,58 @@ public class GameController : MonoBehaviour
         float clampedY = Mathf.Clamp(targetPosition.y, minY, maxY);
 
         mainCam.transform.position = new Vector3(clampedX, clampedY, mainCam.transform.position.z);
+    }
+    public void FireBullet(GameObject prefab, Vector3 startPos, Vector2 dir, bool isEnemy)
+    {
+        dir = dir.normalized;
+        if (prefab == null) return;
+
+        string key = prefab.name;
+        Bullet bullet = null;
+
+        if (bulletPools.ContainsKey(key) && bulletPools[key].Count > 0)
+        {
+            bullet = bulletPools[key].Dequeue();
+        }
+        else
+        {
+            GameObject go = Instantiate(prefab, bulletContainer);
+            bullet = go.GetComponent<Bullet>();
+            go.name = key; 
+            bullet.PoolKey = key;
+        }
+
+        bullet.transform.position = startPos;
+        bullet.gameObject.SetActive(true);
+        bullet.Init(isEnemy, dir);
+        
+        activeBullets.Add(bullet);
+    }
+
+    public void ReturnBullet(Bullet bullet)
+    {
+        print("returning");
+        if (!activeBullets.Contains(bullet)) return;
+
+        activeBullets.Remove(bullet);
+
+        string key = bullet.PoolKey;
+
+        if (!bulletPools.ContainsKey(key))
+        {
+            bulletPools[key] = new Queue<Bullet>();
+        }
+
+        bullet.gameObject.SetActive(false);
+        bulletPools[key].Enqueue(bullet);
+    }
+
+    public void ClearBullets()
+    {
+        List<Bullet> bulletsToRemove = new List<Bullet>(activeBullets);
+        foreach (var bullet in bulletsToRemove)
+        {
+            ReturnBullet(bullet);
+        }
     }
 }
