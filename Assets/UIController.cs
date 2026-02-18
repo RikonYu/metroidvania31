@@ -5,11 +5,14 @@ using UnityEngine;
 public class UIController : MonoBehaviour
 {
     public static UIController instance;
+
     public float HPLenUnit;
     public GameObject HPParent;
     public GameObject BossHPParent;
     GameObject HP, HPBG;
     GameObject BOSSHP;
+
+    public GameObject MinimapBG;
 
     // Start is called before the first frame update
     private void Awake()
@@ -21,10 +24,12 @@ public class UIController : MonoBehaviour
         SetBossHP(20, 50);
     }
 
+
+
     // Update is called once per frame
     void Update()
     {
-        
+
     }
     public void ShowLose()
     {
@@ -41,6 +46,29 @@ public class UIController : MonoBehaviour
         BossHPParent.SetActive(true);
         HP.GetComponent<RectTransform>().sizeDelta = new Vector2(HPLenUnit * currenthp, 100f);
         HPBG.GetComponent<RectTransform>().sizeDelta = new Vector2(HPLenUnit * maxhp, 100f);
-        BOSSHP.GetComponent<RectTransform>().sizeDelta = new Vector2(1600f*currenthp/maxhp, 100f);
+        BOSSHP.GetComponent<RectTransform>().sizeDelta = new Vector2(1600f * currenthp / maxhp, 100f);
     }
+
+    public void ToggleMinimap()
+    {
+        if (MinimapBG.activeSelf)
+        {
+            HideMinimap();
+        }
+        else
+            ShowMinimap();
+    }
+
+    public void ShowMinimap()
+    {
+        MinimapBG.SetActive(true);
+        Minimap.instance.gridParent.gameObject.SetActive(true);
+    }
+
+    public void HideMinimap()
+    {
+        MinimapBG.SetActive(false);
+        Minimap.instance.gridParent.gameObject.SetActive(false);
+    }
+
 }

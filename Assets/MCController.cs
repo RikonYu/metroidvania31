@@ -74,6 +74,10 @@ public class MCController : MonoBehaviour
         {
             GameController.instance.InteractingObject?.Interact();
         }
+        if (Input.GetKeyDown(KeyCode.M))
+        {
+            UIController.instance.ToggleMinimap();
+        }
 
         if (Input.GetKey(KeyCode.W))
         {

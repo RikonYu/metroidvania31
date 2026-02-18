@@ -15,7 +15,13 @@ public class Minimap : MonoBehaviour
 { 
     public static Minimap instance;
 
+    [Header("Target")]
+    public Transform player;
+
+    [Header("Settings")]
     public float cellSizeWorldUnits = 2f;
+    public float inactiveAlpha = 0.5f;
+    public float activeAlpha = 1.0f;
 
     [Header("Grid Configuration")]
     public Vector2Int tileUnitRatio = new Vector2Int(16, 9);
@@ -27,6 +33,15 @@ public class Minimap : MonoBehaviour
 
     [HideInInspector]
     public List<MinimapNode> generatedMapData = new List<MinimapNode>();
+
+    private Dictionary<Vector2Int, Image> gridImages = new Dictionary<Vector2Int, Image>();
+    
+    private float mapMinX;
+    private float mapMaxY;
+    private float blockWidthWorld;
+    private float blockHeightWorld;
+    
+    private Vector2Int lastPlayerGridPos = new Vector2Int(-9999, -9999);
 
     private void Awake()
     {
@@ -45,10 +60,53 @@ public class Minimap : MonoBehaviour
             gridParent = transform.Find("GridParent");
         }
         
+        if (player == null)
+        {
+            GameObject p = GameObject.FindGameObjectWithTag("Player");
+            if (p != null) player = p.transform;
+        }
+
         if (GameController.instance != null)
         {
             GenerateMap();
         }
+    }
+
+    private void Update()
+    {
+        UpdatePlayerPosition();
+    }
+
+    private void UpdatePlayerPosition()
+    {
+        if (player == null || gridImages.Count == 0) return;
+
+        int px = Mathf.RoundToInt((player.position.x - mapMinX) / blockWidthWorld);
+        int py = Mathf.RoundToInt((mapMaxY - player.position.y) / blockHeightWorld);
+        
+        Vector2Int currentPlayerGridPos = new Vector2Int(px, py);
+
+        if (currentPlayerGridPos == lastPlayerGridPos) return;
+
+        if (gridImages.TryGetValue(lastPlayerGridPos, out Image lastImg))
+        {
+            SetImageAlpha(lastImg, inactiveAlpha);
+        }
+
+        if (gridImages.TryGetValue(currentPlayerGridPos, out Image currentImg))
+        {
+            SetImageAlpha(currentImg, activeAlpha);
+        }
+
+        lastPlayerGridPos = currentPlayerGridPos;
+    }
+
+    private void SetImageAlpha(Image img, float alpha)
+    {
+        if (img == null) return;
+        Color c = img.color;
+        c.a = alpha;
+        img.color = c;
     }
 
     [ContextMenu("Generate Map")]
@@ -66,19 +124,19 @@ public class Minimap : MonoBehaviour
 
         generatedMapData.Clear();
 
-        float minWorldX = float.MaxValue;
-        float maxWorldY = float.MinValue;
+        mapMinX = float.MaxValue;
+        mapMaxY = float.MinValue;
 
         foreach (var room in allRooms)
         {
             if (room == null) continue;
             Vector3 pos = room.transform.position;
-            if (pos.x < minWorldX) minWorldX = pos.x;
-            if (pos.y > maxWorldY) maxWorldY = pos.y;
+            if (pos.x < mapMinX) mapMinX = pos.x;
+            if (pos.y > mapMaxY) mapMaxY = pos.y;
         }
 
-        float blockWidthWorld = tileUnitRatio.x * cellSizeWorldUnits;
-        float blockHeightWorld = tileUnitRatio.y * cellSizeWorldUnits;
+        blockWidthWorld = tileUnitRatio.x * cellSizeWorldUnits;
+        blockHeightWorld = tileUnitRatio.y * cellSizeWorldUnits;
 
         foreach (var room in allRooms)
         {
@@ -93,8 +151,8 @@ public class Minimap : MonoBehaviour
             int sizeY = Mathf.Max(1, Mathf.RoundToInt(rawHeight));
             Vector2Int roomGridSize = new Vector2Int(sizeX, sizeY);
 
-            int gridX = Mathf.RoundToInt((roomWorldPos.x - minWorldX) / blockWidthWorld);
-            int gridY = Mathf.RoundToInt((maxWorldY - roomWorldPos.y) / blockHeightWorld);
+            int gridX = Mathf.RoundToInt((roomWorldPos.x - mapMinX) / blockWidthWorld);
+            int gridY = Mathf.RoundToInt((mapMaxY - roomWorldPos.y) / blockHeightWorld);
 
             MinimapNode node = new MinimapNode
             {
@@ -113,6 +171,9 @@ public class Minimap : MonoBehaviour
     {
         if (gridParent == null || uiGridPrefab == null) return;
 
+        gridImages.Clear();
+        lastPlayerGridPos = new Vector2Int(-9999, -9999);
+
         var children = new List<GameObject>();
         foreach (Transform child in gridParent) children.Add(child.gameObject);
         
@@ -130,7 +191,19 @@ public class Minimap : MonoBehaviour
                 {
                     GameObject uiCell = Instantiate(uiGridPrefab, gridParent);
                     RectTransform rect = uiCell.GetComponent<RectTransform>();
-                    
+                    Image img = uiCell.GetComponent<Image>();
+
+                    Vector2Int cellKey = new Vector2Int(node.gridPosition.x + x, node.gridPosition.y + y);
+
+                    if (img != null)
+                    {
+                        SetImageAlpha(img, inactiveAlpha);
+                        if (!gridImages.ContainsKey(cellKey))
+                        {
+                            gridImages.Add(cellKey, img);
+                        }
+                    }
+
                     if (rect != null)
                     {
                         rect.pivot = new Vector2(0, 1);
@@ -139,8 +212,8 @@ public class Minimap : MonoBehaviour
                         
                         rect.sizeDelta = new Vector2(uiCellSize, uiCellSize);
                         
-                        float posX = (node.gridPosition.x + x) * uiCellSize;
-                        float posY = -(node.gridPosition.y + y) * uiCellSize;
+                        float posX = cellKey.x * uiCellSize;
+                        float posY = -cellKey.y * uiCellSize;
                         
                         rect.anchoredPosition = new Vector2(posX, posY);
                     }
