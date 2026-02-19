@@ -18,7 +18,7 @@ public class Room : MonoBehaviour
         GameController.instance.Rooms.Add(this);
         Enemies = new List<EnemyController>();
         roomBounds = Tiles.localBounds;
-        roomBounds.center += transform.position;
+        roomBounds.center = Tiles.transform.position + Tiles.localBounds.center;
         print(roomBounds.size);
     }
     public Vector2 GetMinimapSize()

@@ -27,6 +27,7 @@ public class GameController : MonoBehaviour
         instance = this;
         Rooms = new List<Room>();
         Camps = new List<Camp>();
+        
         AllEnemies = new List<EnemyController>();
         mainCam = camParent.transform.Find("Main Camera").GetComponent<Camera>();
     }
@@ -84,23 +85,24 @@ public class GameController : MonoBehaviour
         mc.Respawn(isDropped);
     }
     private void LateUpdate()
-    {
+{
+    if (ActiveRoom == null || mc == null || mainCam == null) return;
 
-        Vector3 targetPosition = mc.transform.position;
+    Vector3 targetPosition = mc.transform.position;
 
-        float camHalfHeight = mainCam.orthographicSize;
-        float camHalfWidth = camHalfHeight * mainCam.aspect;
+    float camHalfHeight = mainCam.orthographicSize;
+    float camHalfWidth = camHalfHeight * mainCam.aspect;
 
-        float minX = ActiveRoom.roomBounds.min.x + camHalfWidth;
-        float maxX = ActiveRoom.roomBounds.max.x - camHalfWidth;
-        float minY = ActiveRoom.roomBounds.min.y + camHalfHeight;
-        float maxY = ActiveRoom.roomBounds.max.y - camHalfHeight;
+    float minX = ActiveRoom.roomBounds.min.x + camHalfWidth;
+    float maxX = ActiveRoom.roomBounds.max.x - camHalfWidth;
+    float minY = ActiveRoom.roomBounds.min.y + camHalfHeight;
+    float maxY = ActiveRoom.roomBounds.max.y - camHalfHeight;
 
-        float clampedX = Mathf.Clamp(targetPosition.x, minX, maxX);
-        float clampedY = Mathf.Clamp(targetPosition.y, minY, maxY);
+    float clampedX = minX > maxX ? ActiveRoom.roomBounds.center.x : Mathf.Clamp(targetPosition.x, minX, maxX);
+    float clampedY = minY > maxY ? ActiveRoom.roomBounds.center.y : Mathf.Clamp(targetPosition.y, minY, maxY);
 
-        mainCam.transform.position = new Vector3(clampedX, clampedY, mainCam.transform.position.z);
-    }
+    mainCam.transform.position = new Vector3(clampedX, clampedY, mainCam.transform.position.z);
+}
     public void FireBullet(GameObject prefab, Vector3 startPos, Vector2 dir, bool isEnemy)
     {
         dir = dir.normalized;
