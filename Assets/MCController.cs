@@ -3,13 +3,14 @@ using System.Collections.Generic;
 using UnityEngine;
 
 [RequireComponent(typeof(Rigidbody2D))]
-[RequireComponent(typeof(BoxCollider2D))]
+[RequireComponent(typeof(Collider2D))]
 public class MCController : MonoBehaviour
 {
     public float MaxHealth, CurrentHealth;
     public GameObject MyBullet;
     public float FireCoolDown;
     private float firecd;
+    
     [Header("Movement")]
     [SerializeField] private float moveSpeed = 8f;
     [SerializeField] private float acceleration = 10f;
@@ -19,7 +20,6 @@ public class MCController : MonoBehaviour
     [SerializeField] private float jumpForce = 16f;
     [SerializeField] private float fallMultiplier = 2.5f;
     [SerializeField] public float MaxJumpTime = 0.75f;
-    
     [SerializeField] private float lowJumpMultiplier = 4f;
     [SerializeField] private float maxFallSpeed = 25f;
 
@@ -37,12 +37,12 @@ public class MCController : MonoBehaviour
     [SerializeField] private LayerMask groundLayer;
 
     [Header("Respawn System")]
-    [Tooltip("复活时相对于地面接触点的偏移量")]
     [SerializeField] private Vector2 respawnOffset = new Vector2(0f, 0.5f);
-    [Tooltip("判定为平坦表面的法线阈值")]
     [SerializeField] private float safeSlopeThreshold = 0.7f;
     
-
+    private Vector2 slopeNormal;
+    private bool isOnSlope;
+    private bool isJumping;
     private Rigidbody2D rb;
     private float horizontalInput;
     private bool isGrounded;
@@ -154,11 +154,30 @@ public class MCController : MonoBehaviour
         float accelRate = (Mathf.Abs(targetSpeed) > 0.01f) ? acceleration : decceleration;
         float movement = speedDif * accelRate * Time.fixedDeltaTime;
 
-        rb.velocity = new Vector2(rb.velocity.x + movement, rb.velocity.y);
+        float newVelX = rb.velocity.x + movement;
+        float newVelY = rb.velocity.y;
+
+        if (isGrounded && !isJumping)
+        {
+            if (isOnSlope)
+            {
+                newVelY = newVelX * (-slopeNormal.x / slopeNormal.y);
+            }
+            else
+            {
+                if (newVelY > 0)
+                {
+                    newVelY = 0f;
+                }
+            }
+        }
+
+        rb.velocity = new Vector2(newVelX, newVelY);
     }
 
     private void PerformJump()
     {
+        isJumping = true;
         rb.velocity = new Vector2(rb.velocity.x, 0);
         rb.AddForce(Vector2.up * jumpForce, ForceMode2D.Impulse);
         jumpBufferCounter = 0f;
@@ -168,29 +187,36 @@ public class MCController : MonoBehaviour
 
     private void ModifyPhysics()
     {
-        if (rb.velocity.y < -maxFallSpeed)
+        if (isGrounded && !isJumping)
         {
-            rb.velocity = new Vector2(rb.velocity.x, -maxFallSpeed);
+            rb.gravityScale = 0f;
         }
-
-        if (rb.velocity.y < 0)
+        else
         {
-            rb.gravityScale = fallMultiplier;
-        }
-        else if (rb.velocity.y > 0)
-        {
-            if (!Input.GetKey(KeyCode.W) || jumpTimeCounter > MaxJumpTime)
+            if (rb.velocity.y < -maxFallSpeed)
             {
-                rb.gravityScale = lowJumpMultiplier;
+                rb.velocity = new Vector2(rb.velocity.x, -maxFallSpeed);
+            }
+
+            if (rb.velocity.y < 0)
+            {
+                rb.gravityScale = fallMultiplier;
+            }
+            else if (rb.velocity.y > 0)
+            {
+                if (!Input.GetKey(KeyCode.W) || jumpTimeCounter > MaxJumpTime)
+                {
+                    rb.gravityScale = lowJumpMultiplier;
+                }
+                else
+                {
+                    rb.gravityScale = 1f;
+                }
             }
             else
             {
                 rb.gravityScale = 1f;
             }
-        }
-        else
-        {
-            rb.gravityScale = 1f;
         }
     }
 
@@ -204,9 +230,50 @@ public class MCController : MonoBehaviour
         wasGrounded = isGrounded;
         isGrounded = Physics2D.OverlapCircle(groundCheck.position, groundCheckRadius, groundLayer);
 
+        if (isGrounded && rb.velocity.y <= 0.1f)
+        {
+            isJumping = false;
+        }
+
         if (isGrounded && !wasGrounded)
         {
             OnLand();
+        }
+
+        CheckSlope();
+    }
+
+private void CheckSlope()
+    {
+        Vector2 rayStart = (Vector2)groundCheck.position + Vector2.up * 0.1f;
+        
+        if (Mathf.Abs(horizontalInput) > 0.01f)
+        {
+            rayStart.x += Mathf.Sign(horizontalInput) * groundCheckRadius;
+        }
+
+        float rayLength = 2.0f; 
+
+        RaycastHit2D hit = Physics2D.Raycast(rayStart, Vector2.down, rayLength, groundLayer);
+        
+        if (hit)
+        {
+            slopeNormal = hit.normal;
+            float slopeAngle = Vector2.Angle(slopeNormal, Vector2.up);
+            
+            if (slopeAngle > 0.1f && slopeAngle < 85f)
+            {
+                isOnSlope = true;
+            }
+            else
+            {
+                isOnSlope = false;
+            }
+        }
+        else
+        {
+            slopeNormal = Vector2.up;
+            isOnSlope = false;
         }
     }
 
@@ -237,7 +304,6 @@ public class MCController : MonoBehaviour
         {
             CurrentHealth = MaxHealth;
             transform.position = GameController.instance.LastCamp.transform.position;
-
             UIController.instance.SetHP(CurrentHealth, MaxHealth);
         }
     }

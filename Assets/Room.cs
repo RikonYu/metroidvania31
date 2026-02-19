@@ -19,7 +19,6 @@ public class Room : MonoBehaviour
         Enemies = new List<EnemyController>();
         roomBounds = Tiles.localBounds;
         roomBounds.center = Tiles.transform.position + Tiles.localBounds.center;
-        print(roomBounds.size);
     }
     public Vector2 GetMinimapSize()
     {
