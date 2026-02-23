@@ -278,6 +278,7 @@ GameObject:
   m_Component:
   - component: {fileID: 4922558175955483961}
   - component: {fileID: 4922558175955483960}
+  - component: {fileID: 9097509909858243642}
   m_Layer: 0
   m_Name: Sprites
   m_TagString: Untagged
@@ -313,6 +314,44 @@ Grid:
   m_CellGap: {x: 0, y: 0, z: 0}
   m_CellLayout: 0
   m_CellSwizzle: 0
+--- !u!1839735485 &9097509909858243642
+Tilemap:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4922558175955483959}
+  m_Enabled: 1
+  m_Tiles: {}
+  m_AnimatedTiles: {}
+  m_TileAssetArray: []
+  m_TileSpriteArray: []
+  m_TileMatrixArray: []
+  m_TileColorArray: []
+  m_TileObjectToInstantiateArray: []
+  m_AnimationFrameRate: 1
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Origin: {x: 0, y: 0, z: 0}
+  m_Size: {x: 0, y: 0, z: 1}
+  m_TileAnchor: {x: 0.5, y: 0.5, z: 0}
+  m_TileOrientation: 0
+  m_TileOrientationMatrix:
+    e00: 1
+    e01: 0
+    e02: 0
+    e03: 0
+    e10: 0
+    e11: 1
+    e12: 0
+    e13: 0
+    e20: 0
+    e21: 0
+    e22: 1
+    e23: 0
+    e30: 0
+    e31: 0
+    e32: 0
+    e33: 1
 --- !u!1 &4922558177362787534
 GameObject:
   m_ObjectHideFlags: 0
@@ -360,10 +399,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   Tiles: {fileID: 4922558177417214646}
-  Enemies: {fileID: 0}
+  Enemies:
+  - {fileID: 0}
   roomBounds:
     m_Center: {x: 0, y: 0, z: 0}
     m_Extent: {x: 0, y: 0, z: 0}
+  IsBossRoom: 0
 --- !u!1 &4922558177417214643
 GameObject:
   m_ObjectHideFlags: 0
@@ -375,6 +416,7 @@ GameObject:
   - component: {fileID: 4922558177417214644}
   - component: {fileID: 4922558177417214646}
   - component: {fileID: 4922558177417214645}
+  - component: {fileID: 3701534104481168594}
   m_Layer: 0
   m_Name: Tiles
   m_TagString: Untagged
@@ -499,7 +541,7 @@ TilemapRenderer:
   m_LightmapParameters: {fileID: 0}
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 1
   m_ChunkSize: {x: 32, y: 32, z: 32}
   m_ChunkCullingBounds: {x: 0, y: 0, z: 0}
   m_MaxChunkCount: 16
@@ -508,3 +550,21 @@ TilemapRenderer:
   m_Mode: 0
   m_DetectChunkCullingBounds: 0
   m_MaskInteraction: 0
+--- !u!114 &3701534104481168594
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4922558177417214643}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 65438989104ac4afdb535b0c6dceb89b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  targetTilemapB: {fileID: 5746363185274859070}
+  rustDark: {r: 0.35, g: 0.15, b: 0.05, a: 1}
+  rustLight: {r: 0.6, g: 0.3, b: 0.1, a: 1}
+  rustThreshold: 0.4
+  noiseScale: 5
+  pixelsPerCell: 8

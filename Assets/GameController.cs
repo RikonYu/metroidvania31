@@ -5,7 +5,7 @@ using UnityEngine;
 public class GameController : MonoBehaviour
 {
     public static GameController instance;
-    public MCController mc;
+    public MCController mc, McPrefab;
     public GameObject camParent;
     Camera mainCam;
     public List<Room> Rooms;
@@ -36,6 +36,8 @@ public class GameController : MonoBehaviour
         foreach (var i in Rooms)
             i.gameObject.SetActive(false);
         ActiveRoom.gameObject.SetActive(true);
+        mc = Instantiate(McPrefab, LastCamp.transform.position + Vector3.up * 0.5f, Quaternion.identity);
+        
     }
     public void ActivateRoom(Room des)
     {
@@ -43,6 +45,14 @@ public class GameController : MonoBehaviour
         ClearBullets();
         ActiveRoom = des;
         des.Activate();
+        if (des.IsSpaceRoom)
+        {
+            mc.GetComponent<Rigidbody2D>().gravityScale = mc.GetComponent<MCController>().spaceFallMultiplier;
+        }
+        else
+        {
+            mc.GetComponent<Rigidbody2D>().gravityScale = mc.GetComponent<MCController>().fallMultiplier;
+        }
     }
 
     // Update is called once per frame

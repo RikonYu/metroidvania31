@@ -10,6 +10,7 @@ public class Room : MonoBehaviour
 
     public Bounds roomBounds;
     public bool IsBossRoom;
+    public bool IsSpaceRoom;
     private Camera mainCam;
     private Transform playerTransform;
 

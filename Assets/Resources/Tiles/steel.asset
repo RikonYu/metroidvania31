@@ -9,7 +9,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9d1514134bc4fbd41bb739b1b9a49231, type: 3}
+  m_Script: {fileID: 11500000, guid: 5d22976739e9a4bf4a7b366a5045176b, type: 3}
   m_Name: steel
   m_EditorClassIdentifier: 
   m_DefaultSprite: {fileID: 21300000, guid: b2cadbcd2303f4c9fb0286771533c973, type: 3}
@@ -67,3 +67,7 @@ MonoBehaviour:
     - {x: 0, y: -1, z: 0}
     - {x: 0, y: 1, z: 0}
     m_RuleTransform: 1
+  connectedTiles:
+  - {fileID: 11400000, guid: b7f7cd67d98a141e3ba4892e2c4b1ca2, type: 2}
+  - {fileID: 11400000, guid: 8c8a7c851b2b645fbba47dea727e63e2, type: 2}
+  - {fileID: 11400000}

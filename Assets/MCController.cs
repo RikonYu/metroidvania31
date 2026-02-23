@@ -7,8 +7,8 @@ using UnityEngine;
 public class MCController : MonoBehaviour
 {
     public float MaxHealth, CurrentHealth;
-    public GameObject MyBullet;
-    public float FireCoolDown;
+    public GameObject BulletPrefab;
+    float FireCoolDown;
     private float firecd;
     
     [Header("Movement")]
@@ -18,7 +18,9 @@ public class MCController : MonoBehaviour
 
     [Header("Jump & Gravity")]
     [SerializeField] private float jumpForce = 16f;
-    [SerializeField] private float fallMultiplier = 2.5f;
+    [SerializeField] public float fallMultiplier = 5f;
+    [SerializeField] public float spaceFallMultiplier = 0.5f;
+    
     [SerializeField] public float MaxJumpTime = 0.75f;
     [SerializeField] private float lowJumpMultiplier = 4f;
     [SerializeField] private float maxFallSpeed = 25f;
@@ -34,11 +36,11 @@ public class MCController : MonoBehaviour
     [Header("Detection")]
     [SerializeField] private Transform groundCheck;
     [SerializeField] private float groundCheckRadius = 0.2f;
-    [SerializeField] private LayerMask groundLayer;
+    [SerializeField] private LayerMask groundLayer, safeGroundLayer;
 
     [Header("Respawn System")]
     [SerializeField] private Vector2 respawnOffset = new Vector2(0f, 0.5f);
-    [SerializeField] private float safeSlopeThreshold = 0.7f;
+    [SerializeField] private float safeSlopeThreshold = 0.5f;
     
     private Vector2 slopeNormal;
     private bool isOnSlope;
@@ -63,6 +65,12 @@ public class MCController : MonoBehaviour
         firecd = 0f;
         CurrentHealth = MaxHealth;
         UIController.instance.SetHP(CurrentHealth, MaxHealth);
+    }
+
+    public void SwapBullet(GameObject NewBulletPrefab)
+    {
+        BulletPrefab = NewBulletPrefab;
+        FireCoolDown = NewBulletPrefab.GetComponent<Bullet>().CoolDown;
     }
 
     void Update()
@@ -100,15 +108,15 @@ public class MCController : MonoBehaviour
         firecd -= Time.deltaTime;
         if (Input.GetMouseButton(0))
         {
-            if (firecd <= 0f)
+            if (BulletPrefab != null && firecd <= 0f)
             {
                 firecd = FireCoolDown;
                 Vector3 worldPosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
                 worldPosition.z = 0;
                 GameController.instance.FireBullet(
-                    MyBullet,
+                    BulletPrefab,
                     transform.position,
-                    worldPosition,
+                    worldPosition - transform.position,
                     false
                 );
             }
@@ -281,7 +289,7 @@ private void CheckSlope()
     {
         if (isGrounded && rb.velocity.y <= 0.1f)
         {
-            RaycastHit2D hit = Physics2D.Raycast(groundCheck.position, Vector2.down, groundCheckRadius * 2f, groundLayer);
+            RaycastHit2D hit = Physics2D.Raycast(groundCheck.position, Vector2.down, groundCheckRadius * 2f, safeGroundLayer);
 
             if (hit.collider != null)
             {
@@ -297,6 +305,7 @@ private void CheckSlope()
     {
         firecd = 0f;
         rb.velocity = Vector2.zero;
+
         isStunned = false;
         if (isDropped)
             transform.position = lastSafePosition;
@@ -306,6 +315,7 @@ private void CheckSlope()
             transform.position = GameController.instance.LastCamp.transform.position;
             UIController.instance.SetHP(CurrentHealth, MaxHealth);
         }
+        print(transform.position);
     }
 
     private void OnLand()
