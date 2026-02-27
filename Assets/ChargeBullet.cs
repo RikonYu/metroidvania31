@@ -1,0 +1,26 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class ChargeBullet : Bullet
+{
+    public float MaxChargeTime = 2f;
+    public static float NextChargeRatio;
+
+    public override void Init(bool isenemy, Vector2 dir)
+    {
+        this.Damage = this.Damage * NextChargeRatio;
+        base.Init(isenemy, dir);
+    }
+
+    protected override void OnTriggerEnter2D(Collider2D collision)
+    {
+        base.OnTriggerEnter2D(collision);
+        print(collision.gameObject.GetComponent<ChargeDoor>());
+        if (collision.gameObject.GetComponent<ChargeDoor>() != null)
+        {
+            collision.gameObject.GetComponent<ChargeDoor>().Break();
+            ReturnToPool();
+        }
+    }
+}

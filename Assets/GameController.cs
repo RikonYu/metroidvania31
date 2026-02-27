@@ -1,4 +1,4 @@
-using System.Collections;
+    using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -19,6 +19,8 @@ public class GameController : MonoBehaviour
 
     private Dictionary<string, Queue<Bullet>> bulletPools = new Dictionary<string, Queue<Bullet>>();
     private HashSet<Bullet> activeBullets = new HashSet<Bullet>();
+
+    public bool CanDoubleJump;
 
     [SerializeField] private Transform bulletContainer;
 
@@ -45,14 +47,7 @@ public class GameController : MonoBehaviour
         ClearBullets();
         ActiveRoom = des;
         des.Activate();
-        if (des.IsSpaceRoom)
-        {
-            mc.GetComponent<Rigidbody2D>().gravityScale = mc.GetComponent<MCController>().spaceFallMultiplier;
-        }
-        else
-        {
-            mc.GetComponent<Rigidbody2D>().gravityScale = mc.GetComponent<MCController>().fallMultiplier;
-        }
+        mc.IsInSpace = des.IsSpaceRoom;
     }
 
     // Update is called once per frame
@@ -110,7 +105,6 @@ public class GameController : MonoBehaviour
 
     float clampedX = minX > maxX ? ActiveRoom.roomBounds.center.x : Mathf.Clamp(targetPosition.x, minX, maxX);
     float clampedY = minY > maxY ? ActiveRoom.roomBounds.center.y : Mathf.Clamp(targetPosition.y, minY, maxY);
-
     mainCam.transform.position = new Vector3(clampedX, clampedY, mainCam.transform.position.z);
 }
     public void FireBullet(GameObject prefab, Vector3 startPos, Vector2 dir, bool isEnemy)

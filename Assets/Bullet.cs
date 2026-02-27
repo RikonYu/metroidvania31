@@ -8,9 +8,11 @@ public class Bullet : MonoBehaviour
     public bool IsEnemy;
     public float Speed;
     public float Damage;
+    public float Duration;
     public float CoolDown;
     public int MaxBounceCount = 3;
     public float MinSpeedThreshold = 1.0f;
+    public float EnergyCost = 10f;
 
     [HideInInspector]
     public string PoolKey;
@@ -20,16 +22,18 @@ public class Bullet : MonoBehaviour
     private int groundLayerMask;
     private Rigidbody2D rb2d;
     private Vector2 velocity;
+    float dur;
 
     public virtual void Init(bool isenemy, Vector2 dir)
     {
         this.IsEnemy = isenemy;
         this.dir = dir.normalized;
         currentBounces = 0;
-        
+        dur = Duration;
+
         rb2d = GetComponent<Rigidbody2D>();
         velocity = this.dir * Speed;
-        
+
         UpdateRotation();
 
         if (isenemy)
@@ -42,6 +46,12 @@ public class Bullet : MonoBehaviour
 
     void Update()
     {
+        dur -= Time.deltaTime;
+        if (dur <= 0f)
+        {
+            Destroy(gameObject);
+            return;
+        }
         if (rb2d != null && rb2d.gravityScale > 0)
         {
             velocity += Physics2D.gravity * rb2d.gravityScale * Time.deltaTime;
@@ -97,22 +107,27 @@ public class Bullet : MonoBehaviour
         transform.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg);
     }
 
-    private void OnTriggerEnter2D(Collider2D collision)
+    protected virtual void OnTriggerEnter2D(Collider2D collision)
     {
-        EnemyController enemy = collision.gameObject.GetComponent<EnemyController>();
-        if (enemy != null)
+        if (IsEnemy)
         {
-            enemy.Hurt(this.Damage);
-            ReturnToPool();
-            return;
+            MCController mc = collision.gameObject.GetComponent<MCController>();
+            if (mc != null)
+            {
+                mc.Hurt(this.Damage);
+                ReturnToPool();
+                return;
+            }
         }
-
-        MCController mc = collision.gameObject.GetComponent<MCController>();
-        if (mc != null)
+        else
         {
-            mc.Hurt(this.Damage);
-            ReturnToPool();
-            return;
+            EnemyController enemy = collision.gameObject.GetComponent<EnemyController>();
+            if (enemy != null)
+            {
+                enemy.Hurt(this.Damage);
+                ReturnToPool();
+                return;
+            }
         }
     }
 

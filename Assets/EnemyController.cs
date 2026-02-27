@@ -61,4 +61,9 @@ public class EnemyController : MonoBehaviour
     {
         CurrentHP -= dmg;
     }
+
+    public void Freeze(float duration)
+    {
+
+    }
 }

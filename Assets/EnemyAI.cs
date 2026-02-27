@@ -50,7 +50,7 @@ public class EnemyAI : MonoBehaviour
     public float searchWaitTime = 2.0f;
     private float searchTimer;
     private int currentWaypointIndex = 0;
-    private List<Transform> waypoints;
+    private List<Vector3> waypoints;
 
     private Vector2 moveInput;
 
@@ -140,12 +140,12 @@ public class EnemyAI : MonoBehaviour
 
         if (waypoints == null || waypoints.Count == 0) return;
 
-        Transform targetPoint = waypoints[currentWaypointIndex];
-        CalculateMovement(targetPoint.position);
+        Vector3 targetPoint = waypoints[currentWaypointIndex];
+        CalculateMovement(targetPoint);
 
         float distToWaypoint = controller.IsFlying
-            ? Vector2.Distance(transform.position, targetPoint.position)
-            : Mathf.Abs(transform.position.x - targetPoint.position.x);
+            ? Vector2.Distance(transform.position, targetPoint)
+            : Mathf.Abs(transform.position.x - targetPoint.x);
 
         if (distToWaypoint < waypointTolerance)
         {
@@ -298,7 +298,7 @@ public class EnemyAI : MonoBehaviour
 
         for (int i = 0; i < waypoints.Count; i++)
         {
-            float dst = Vector2.Distance(transform.position, waypoints[i].position);
+            float dst = Vector2.Distance(transform.position, waypoints[i]);
             if (dst < minDst)
             {
                 minDst = dst;

@@ -7,41 +7,49 @@ using UnityEngine;
 public class MCController : MonoBehaviour
 {
     public float MaxHealth, CurrentHealth;
+
+    [Header("Energy & Weapon System")]
+    public float MaxEnergy = 100f;
+    public float CurrentEnergy;
+    public float EnergyRegenRate = 15f;
+    public GameObject[] WeaponList;
     public GameObject BulletPrefab;
-    float FireCoolDown;
+    private int currentWeaponIndex = 0;
+    private float FireCoolDown;
     private float firecd;
-    
+
+    private bool isCharging;
+    private float currentChargeTime;
+
+    public bool IsInSpace;
     [Header("Movement")]
     [SerializeField] private float moveSpeed = 8f;
-    [SerializeField] private float acceleration = 10f;
-    [SerializeField] private float decceleration = 10f;
 
-    [Header("Jump & Gravity")]
+    [Header("Jump & Gravity (Modified)")]
     [SerializeField] private float jumpForce = 16f;
-    [SerializeField] public float fallMultiplier = 5f;
-    [SerializeField] public float spaceFallMultiplier = 0.5f;
-    
-    [SerializeField] public float MaxJumpTime = 0.75f;
-    [SerializeField] private float lowJumpMultiplier = 4f;
+    [SerializeField] private float baseGravityScale = 4f;
+    [SerializeField] private float baseSpaceGravityScale = 0.5f;
     [SerializeField] private float maxFallSpeed = 25f;
 
     [Header("Game Feel")]
     [SerializeField] private float coyoteTime = 0.1f;
     [SerializeField] private float jumpBufferTime = 0.1f;
 
-    [Header("Hard Landing")]
-    [SerializeField] private float hardLandingThreshold = -20f;
-    [SerializeField] private float stunDuration = 0.5f;
+    [Header("Double Jump")]
+    [SerializeField] private float doubleJumpCooldown = 0.2f;
+    private bool hasDoubleJumped;
+    private float timeSinceLastJump;
 
     [Header("Detection")]
     [SerializeField] private Transform groundCheck;
-    [SerializeField] private float groundCheckRadius = 0.2f;
+    [SerializeField] private float groundCheckWidth = 0.45f;
+    [SerializeField] private float groundCheckHeight = 0.1f;
     [SerializeField] private LayerMask groundLayer, safeGroundLayer;
 
     [Header("Respawn System")]
     [SerializeField] private Vector2 respawnOffset = new Vector2(0f, 0.5f);
     [SerializeField] private float safeSlopeThreshold = 0.5f;
-    
+
     private Vector2 slopeNormal;
     private bool isOnSlope;
     private bool isJumping;
@@ -52,91 +60,217 @@ public class MCController : MonoBehaviour
     private float coyoteTimeCounter;
     private float jumpBufferCounter;
     private bool isStunned;
-    private float lastVerticalVelocity;
     private Vector3 lastSafePosition;
-    private float jumpTimeCounter;
+    private Platform currentPlatform;
+
+    float freezeCounter;
 
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
         rb.freezeRotation = true;
         rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
+
+        Collider2D coll = GetComponent<Collider2D>();
+        if (coll != null)
+        {
+            PhysicsMaterial2D noFrictionMat = new PhysicsMaterial2D("NoFriction");
+            noFrictionMat.friction = 0f;
+            noFrictionMat.bounciness = 0f;
+            coll.sharedMaterial = noFrictionMat;
+        }
+
         lastSafePosition = transform.position;
         firecd = 0f;
         CurrentHealth = MaxHealth;
+        CurrentEnergy = MaxEnergy;
         UIController.instance.SetHP(CurrentHealth, MaxHealth);
+
+        if (WeaponList != null && WeaponList.Length > 0)
+        {
+            SwapBullet(WeaponList[0]);
+        }
+        else if (BulletPrefab != null)
+        {
+            SwapBullet(BulletPrefab);
+        }
     }
 
     public void SwapBullet(GameObject NewBulletPrefab)
     {
         BulletPrefab = NewBulletPrefab;
-        FireCoolDown = NewBulletPrefab.GetComponent<Bullet>().CoolDown;
+        if (BulletPrefab != null)
+        {
+            FireCoolDown = BulletPrefab.GetComponent<Bullet>().CoolDown;
+        }
+    }
+
+    private void HandleWeaponSwitch()
+    {
+        if (WeaponList == null || WeaponList.Length <= 1) return;
+
+        float scroll = Input.GetAxis("Mouse ScrollWheel");
+        if (scroll != 0f)
+        {
+            if (scroll > 0f)
+                currentWeaponIndex = (currentWeaponIndex + 1) % WeaponList.Length;
+            else
+                currentWeaponIndex = (currentWeaponIndex - 1 + WeaponList.Length) % WeaponList.Length;
+
+            SwapBullet(WeaponList[currentWeaponIndex]);
+        }
+    }
+
+    private void HandleWeaponsAndEnergy()
+    {
+        if (BulletPrefab == null) return;
+
+        Bullet currentBulletScript = BulletPrefab.GetComponent<Bullet>();
+        if (currentBulletScript == null) return;
+
+        float energyCost = currentBulletScript.EnergyCost;
+        bool isChargeWeapon = BulletPrefab.GetComponent<ChargeBullet>() != null;
+        bool isFlameWeapon = BulletPrefab.GetComponent<FlameBullet>() != null;
+
+        bool isFiringInput = Input.GetMouseButton(0);
+
+        if (isChargeWeapon)
+        {
+            ChargeBullet cbScript = BulletPrefab.GetComponent<ChargeBullet>();
+
+            if (Input.GetMouseButtonDown(0) && CurrentEnergy >= energyCost && firecd <= 0f)
+            {
+                isCharging = true;
+                currentChargeTime = 0f;
+            }
+
+            if (isCharging && isFiringInput)
+            {
+                currentChargeTime += Time.deltaTime;
+                if (currentChargeTime > cbScript.MaxChargeTime)
+                {
+                    currentChargeTime = cbScript.MaxChargeTime;
+                }
+            }
+
+            if (Input.GetMouseButtonUp(0) && isCharging)
+            {
+                isCharging = false;
+                FireChargeWeapon(currentChargeTime, cbScript.MaxChargeTime, energyCost);
+            }
+        }
+        else
+        {
+            if (isCharging) isCharging = false;
+
+            if (isFiringInput && firecd <= 0f && CurrentEnergy >= energyCost)
+            {
+                FireNormalWeapon(energyCost);
+            }
+        }
+
+        bool canRecover = false;
+
+        if (isFlameWeapon)
+        {
+            if (!isFiringInput)
+            {
+                canRecover = true;
+            }
+        }
+        else
+        {
+            if (CurrentEnergy < energyCost)
+            {
+                canRecover = true;
+            }
+        }
+
+        if (canRecover)
+        {
+            CurrentEnergy += EnergyRegenRate * Time.deltaTime;
+            if (CurrentEnergy > MaxEnergy)
+            {
+                CurrentEnergy = MaxEnergy;
+            }
+        }
+    }
+
+    private void FireNormalWeapon(float cost)
+    {
+        CurrentEnergy -= cost;
+        firecd = FireCoolDown;
+
+        Vector3 worldPosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+        worldPosition.z = 0;
+        GameController.instance.FireBullet(BulletPrefab, transform.position, worldPosition - transform.position, false);
+    }
+
+    private void FireChargeWeapon(float chargeTime, float maxChargeTime, float cost)
+    {
+        CurrentEnergy -= cost;
+        firecd = FireCoolDown;
+
+        float ratio = Mathf.Clamp01(chargeTime / maxChargeTime);
+        ChargeBullet.NextChargeRatio = ratio;
+
+        Vector3 worldPosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+        worldPosition.z = 0;
+        GameController.instance.FireBullet(BulletPrefab, transform.position, worldPosition - transform.position, false);
     }
 
     void Update()
     {
         if (isStunned) return;
-
-        horizontalInput = Input.GetAxisRaw("Horizontal");
-        if (Input.GetKeyDown(KeyCode.E))
-        {
-            GameController.instance.InteractingObject?.Interact();
-        }
-        if (Input.GetKeyDown(KeyCode.M))
-        {
-            UIController.instance.ToggleMinimap();
-        }
-
-        if (Input.GetKey(KeyCode.W))
-        {
-            jumpBufferCounter = jumpBufferTime;
-        }
-        else
-        {
-            jumpBufferCounter -= Time.deltaTime;
-        }
-
-        if (rb.velocity.y > 0)
-        {
-            jumpTimeCounter += Time.deltaTime;
-        }
-        else
-        {
-            jumpTimeCounter = 0;
-        }
-
+        if (freezeCounter > 0f) freezeCounter -= Time.deltaTime;
         firecd -= Time.deltaTime;
-        if (Input.GetMouseButton(0))
+
+        timeSinceLastJump += Time.deltaTime;
+
+        if (freezeCounter <= 0f)
         {
-            if (BulletPrefab != null && firecd <= 0f)
+            horizontalInput = Input.GetAxisRaw("Horizontal");
+
+            if (Input.GetKeyDown(KeyCode.E))
+                GameController.instance.InteractingObject?.Interact();
+
+            if (Input.GetKeyDown(KeyCode.M))
+                UIController.instance.ToggleMinimap();
+
+            if (Input.GetKeyDown(KeyCode.W))
             {
-                firecd = FireCoolDown;
-                Vector3 worldPosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
-                worldPosition.z = 0;
-                GameController.instance.FireBullet(
-                    BulletPrefab,
-                    transform.position,
-                    worldPosition - transform.position,
-                    false
-                );
+                jumpBufferCounter = jumpBufferTime;
+
+                if (coyoteTimeCounter <= 0f && GameController.instance.CanDoubleJump && !hasDoubleJumped && timeSinceLastJump >= doubleJumpCooldown)
+                {
+                    PerformDoubleJump();
+                    jumpBufferCounter = 0f;
+                }
             }
+            else
+            {
+                jumpBufferCounter -= Time.deltaTime;
+            }
+
+            if (Input.GetKeyUp(KeyCode.W))
+            {
+                if (rb.velocity.y > 0)
+                {
+                    rb.velocity = new Vector2(rb.velocity.x, rb.velocity.y * 0.5f);
+                }
+            }
+
+            HandleWeaponSwitch();
+            HandleWeaponsAndEnergy();
         }
 
         if (isGrounded)
-        {
             coyoteTimeCounter = coyoteTime;
-        }
         else
-        {
             coyoteTimeCounter -= Time.deltaTime;
-        }
 
         if (jumpBufferCounter > 0f && coyoteTimeCounter > 0f)
-        {
             PerformJump();
-        }
-
-        lastVerticalVelocity = rb.velocity.y;
     }
 
     void FixedUpdate()
@@ -147,7 +281,7 @@ public class MCController : MonoBehaviour
         if (isStunned)
         {
             rb.velocity = new Vector2(0, rb.velocity.y);
-            ApplyGravity();
+            ModifyPhysics();
             return;
         }
 
@@ -157,26 +291,40 @@ public class MCController : MonoBehaviour
 
     private void Move()
     {
-        float targetSpeed = horizontalInput * moveSpeed;
-        float speedDif = targetSpeed - rb.velocity.x;
-        float accelRate = (Mathf.Abs(targetSpeed) > 0.01f) ? acceleration : decceleration;
-        float movement = speedDif * accelRate * Time.fixedDeltaTime;
-
-        float newVelX = rb.velocity.x + movement;
+        float targetVelX = horizontalInput * moveSpeed;
+        float newVelX = targetVelX;
         float newVelY = rb.velocity.y;
+
+        Vector2 platformVel = Vector2.zero;
+        if (isGrounded && !isJumping && currentPlatform != null)
+        {
+            platformVel = currentPlatform.GetVelocity();
+            newVelX += platformVel.x;
+        }
 
         if (isGrounded && !isJumping)
         {
             if (isOnSlope)
             {
-                newVelY = newVelX * (-slopeNormal.x / slopeNormal.y);
+                newVelY = targetVelX * (-slopeNormal.x / slopeNormal.y);
             }
             else
             {
-                if (newVelY > 0)
+                if (currentPlatform != null)
+                {
+                    newVelY = platformVel.y;
+                }
+                else if (newVelY > 0)
                 {
                     newVelY = 0f;
                 }
+            }
+        }
+        else if (wasGrounded && !isGrounded && !isJumping)
+        {
+            if (newVelY > 0)
+            {
+                newVelY = 0f;
             }
         }
 
@@ -186,11 +334,18 @@ public class MCController : MonoBehaviour
     private void PerformJump()
     {
         isJumping = true;
-        rb.velocity = new Vector2(rb.velocity.x, 0);
-        rb.AddForce(Vector2.up * jumpForce, ForceMode2D.Impulse);
+        timeSinceLastJump = 0f;
+        rb.velocity = new Vector2(rb.velocity.x, jumpForce);
         jumpBufferCounter = 0f;
         coyoteTimeCounter = 0f;
-        jumpTimeCounter = 0f;
+    }
+
+    private void PerformDoubleJump()
+    {
+        isJumping = true;
+        hasDoubleJumped = true;
+        timeSinceLastJump = 0f;
+        rb.velocity = new Vector2(rb.velocity.x, jumpForce);
     }
 
     private void ModifyPhysics()
@@ -201,82 +356,61 @@ public class MCController : MonoBehaviour
         }
         else
         {
+            rb.gravityScale = IsInSpace ? baseSpaceGravityScale : baseGravityScale;
+
             if (rb.velocity.y < -maxFallSpeed)
             {
                 rb.velocity = new Vector2(rb.velocity.x, -maxFallSpeed);
             }
-
-            if (rb.velocity.y < 0)
-            {
-                rb.gravityScale = fallMultiplier;
-            }
-            else if (rb.velocity.y > 0)
-            {
-                if (!Input.GetKey(KeyCode.W) || jumpTimeCounter > MaxJumpTime)
-                {
-                    rb.gravityScale = lowJumpMultiplier;
-                }
-                else
-                {
-                    rb.gravityScale = 1f;
-                }
-            }
-            else
-            {
-                rb.gravityScale = 1f;
-            }
         }
     }
 
-    private void ApplyGravity()
+    public void Freeze(float t)
     {
-        rb.gravityScale = (rb.velocity.y < 0) ? fallMultiplier : 1f;
+        freezeCounter = t;
+        rb.velocity = Vector2.zero;
     }
 
     private void CheckGround()
     {
         wasGrounded = isGrounded;
-        isGrounded = Physics2D.OverlapCircle(groundCheck.position, groundCheckRadius, groundLayer);
 
-        if (isGrounded && rb.velocity.y <= 0.1f)
+        float safeWidth = Mathf.Max(0.01f, groundCheckWidth - 0.05f);
+        Vector2 size = new Vector2(safeWidth, groundCheckHeight);
+
+        Collider2D hitCollider = Physics2D.OverlapBox(groundCheck.position, size, 0f, groundLayer);
+
+        if (hitCollider != null)
         {
-            isJumping = false;
+            isGrounded = true;
+            hasDoubleJumped = false;
+            currentPlatform = hitCollider.GetComponent<Platform>();
+            if (rb.velocity.y <= 0.1f)
+            {
+                isJumping = false;
+            }
         }
-
-        if (isGrounded && !wasGrounded)
+        else
         {
-            OnLand();
+            isGrounded = false;
+            currentPlatform = null;
         }
 
         CheckSlope();
     }
 
-private void CheckSlope()
+    private void CheckSlope()
     {
         Vector2 rayStart = (Vector2)groundCheck.position + Vector2.up * 0.1f;
-        
-        if (Mathf.Abs(horizontalInput) > 0.01f)
-        {
-            rayStart.x += Mathf.Sign(horizontalInput) * groundCheckRadius;
-        }
-
-        float rayLength = 2.0f; 
+        float rayLength = 0.4f;
 
         RaycastHit2D hit = Physics2D.Raycast(rayStart, Vector2.down, rayLength, groundLayer);
-        
+
         if (hit)
         {
             slopeNormal = hit.normal;
             float slopeAngle = Vector2.Angle(slopeNormal, Vector2.up);
-            
-            if (slopeAngle > 0.1f && slopeAngle < 85f)
-            {
-                isOnSlope = true;
-            }
-            else
-            {
-                isOnSlope = false;
-            }
+            isOnSlope = (slopeAngle > 0.1f && slopeAngle < 85f);
         }
         else
         {
@@ -289,7 +423,7 @@ private void CheckSlope()
     {
         if (isGrounded && rb.velocity.y <= 0.1f)
         {
-            RaycastHit2D hit = Physics2D.Raycast(groundCheck.position, Vector2.down, groundCheckRadius * 2f, safeGroundLayer);
+            RaycastHit2D hit = Physics2D.Raycast(groundCheck.position, Vector2.down, 0.5f, safeGroundLayer);
 
             if (hit.collider != null)
             {
@@ -305,8 +439,8 @@ private void CheckSlope()
     {
         firecd = 0f;
         rb.velocity = Vector2.zero;
-
         isStunned = false;
+
         if (isDropped)
             transform.position = lastSafePosition;
         else
@@ -314,15 +448,6 @@ private void CheckSlope()
             CurrentHealth = MaxHealth;
             transform.position = GameController.instance.LastCamp.transform.position;
             UIController.instance.SetHP(CurrentHealth, MaxHealth);
-        }
-        print(transform.position);
-    }
-
-    private void OnLand()
-    {
-        if (lastVerticalVelocity <= hardLandingThreshold)
-        {
-            StartCoroutine(HardLandingStun());
         }
     }
 
@@ -335,22 +460,17 @@ private void CheckSlope()
             GameController.instance.Die(false);
     }
 
-    IEnumerator HardLandingStun()
-    {
-        isStunned = true;
-        yield return new WaitForSeconds(stunDuration);
-        isStunned = false;
-    }
-
     private void OnDrawGizmos()
     {
         if (groundCheck != null)
         {
             Gizmos.color = isGrounded ? Color.green : Color.red;
-            Gizmos.DrawWireSphere(groundCheck.position, groundCheckRadius);
+            float safeWidth = Mathf.Max(0.01f, groundCheckWidth - 0.05f);
+            Vector3 boxSize = new Vector3(safeWidth, groundCheckHeight, 1f);
+            Gizmos.DrawWireCube(groundCheck.position + Vector3.down * 0.025f, boxSize);
 
             Gizmos.color = Color.yellow;
-            Gizmos.DrawLine(groundCheck.position, groundCheck.position + Vector3.down * groundCheckRadius * 2f);
+            Gizmos.DrawLine(groundCheck.position + Vector3.up * 0.1f, groundCheck.position + Vector3.down * 0.3f);
         }
     }
 }

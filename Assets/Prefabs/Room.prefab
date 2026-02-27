@@ -14,7 +14,7 @@ GameObject:
   - component: {fileID: 4304412021218246969}
   - component: {fileID: 4413176778888090274}
   - component: {fileID: 2819725733937406281}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: Tilemap
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -195,7 +195,7 @@ GameObject:
   - component: {fileID: 9085439942728600487}
   - component: {fileID: 8961019227115591518}
   - component: {fileID: 3412061990513391357}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: Colliders
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -398,13 +398,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f77fb4a890381274ea7e5eca678e7c62, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  Tiles: {fileID: 4922558177417214646}
+  Tiles: {fileID: 5746363185274859070}
   Enemies:
   - {fileID: 0}
   roomBounds:
     m_Center: {x: 0, y: 0, z: 0}
     m_Extent: {x: 0, y: 0, z: 0}
   IsBossRoom: 0
+  IsSpaceRoom: 0
+  cameraCenterOffset: {x: 0, y: 0}
 --- !u!1 &4922558177417214643
 GameObject:
   m_ObjectHideFlags: 0
@@ -566,5 +568,6 @@ MonoBehaviour:
   rustDark: {r: 0.35, g: 0.15, b: 0.05, a: 1}
   rustLight: {r: 0.6, g: 0.3, b: 0.1, a: 1}
   rustThreshold: 0.4
-  noiseScale: 5
-  pixelsPerCell: 8
+  globalNoiseScale: 1
+  seedOffset: 0
+  uniqueId: 17cae629e7a148839242b6e9d3b104cd
