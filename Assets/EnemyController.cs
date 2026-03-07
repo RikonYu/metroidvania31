@@ -56,6 +56,7 @@ public class EnemyController : MonoBehaviour
     {
         IsDead = true;
         gameObject.SetActive(false);
+        
     }
     public void Hurt(float dmg)
     {

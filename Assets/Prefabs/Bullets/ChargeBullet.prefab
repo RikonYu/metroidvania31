@@ -146,7 +146,7 @@ MonoBehaviour:
   MinSpeedThreshold: 1
   EnergyCost: 5
   PoolKey: 
-  MaxChargeTime: 2
+  MaxChargeTime: 1
 --- !u!95 &659104737857485755
 Animator:
   serializedVersion: 4

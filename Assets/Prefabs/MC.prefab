@@ -54,7 +54,7 @@ MonoBehaviour:
   CurrentEnergy: 0
   EnergyRegenRate: 15
   WeaponList: []
-  BulletPrefab: {fileID: 7843454385875128354, guid: b9f4dcbbd6880314ca1c848c01ff94f7, type: 3}
+  BulletPrefab: {fileID: 0}
   IsInSpace: 0
   moveSpeed: 8
   jumpForce: 16

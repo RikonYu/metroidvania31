@@ -37,9 +37,10 @@ public class RoomEditor : Editor
 
         foreach (var room in allRooms)
         {
+            if (room.gameObject.activeSelf == false) continue;
             Transform t = room.transform;
             Tilemap[] tilemaps = room.GetComponentsInChildren<Tilemap>(true);
-            
+
             if (tilemaps.Length > 0)
             {
                 float minWorldX = float.MaxValue;
@@ -47,10 +48,13 @@ public class RoomEditor : Editor
 
                 foreach (var tm in tilemaps)
                 {
+
                     tm.CompressBounds();
+
+                    Debug.Log($"{tm.name}, {tm.cellBounds.size}");
                     if (tm.cellBounds.size.x == 0 || tm.cellBounds.size.y == 0) continue;
 
-                    Vector3 bl = tm.transform.TransformPoint(tm.localBounds.min);
+                    Vector3 bl = tm.CellToWorld(tm.cellBounds.min);
                     if (bl.x < minWorldX) minWorldX = bl.x;
                     if (bl.y < minWorldY) minWorldY = bl.y;
                 }
@@ -73,8 +77,10 @@ public class RoomEditor : Editor
             }
 
             Vector3 currentPos = t.position;
+
             float snappedX = Mathf.Round(currentPos.x / stepX) * stepX;
             float snappedY = Mathf.Round(currentPos.y / stepY) * stepY;
+
 
             if (Mathf.Abs(snappedX - currentPos.x) > 0.01f || Mathf.Abs(snappedY - currentPos.y) > 0.01f)
             {

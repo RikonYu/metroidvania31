@@ -22,8 +22,15 @@ public class MCController : MonoBehaviour
     private float currentChargeTime;
 
     public bool IsInSpace;
+
     [Header("Movement")]
     [SerializeField] private float moveSpeed = 8f;
+
+    [Header("Climbing System")]
+    [SerializeField] private float climbSpeed = 4f;
+    private bool isClimbing;
+    private bool canClimb;
+    private Ladder currentLadder;
 
     [Header("Jump & Gravity (Modified)")]
     [SerializeField] private float jumpForce = 16f;
@@ -61,7 +68,10 @@ public class MCController : MonoBehaviour
     private float jumpBufferCounter;
     private bool isStunned;
     private Vector3 lastSafePosition;
+
+    // 互斥的地面类型记录
     private Platform currentPlatform;
+    private Track currentTrack;
 
     float freezeCounter;
 
@@ -121,6 +131,7 @@ public class MCController : MonoBehaviour
         }
     }
 
+    bool canRecover = true;
     private void HandleWeaponsAndEnergy()
     {
         if (BulletPrefab == null) return;
@@ -157,6 +168,7 @@ public class MCController : MonoBehaviour
             {
                 isCharging = false;
                 FireChargeWeapon(currentChargeTime, cbScript.MaxChargeTime, energyCost);
+                canRecover = false;
             }
         }
         else
@@ -166,10 +178,9 @@ public class MCController : MonoBehaviour
             if (isFiringInput && firecd <= 0f && CurrentEnergy >= energyCost)
             {
                 FireNormalWeapon(energyCost);
+                canRecover = false;
             }
         }
-
-        bool canRecover = false;
 
         if (isFlameWeapon)
         {
@@ -180,7 +191,7 @@ public class MCController : MonoBehaviour
         }
         else
         {
-            if (CurrentEnergy < energyCost)
+            if (canRecover || CurrentEnergy < energyCost)
             {
                 canRecover = true;
             }
@@ -219,6 +230,63 @@ public class MCController : MonoBehaviour
         GameController.instance.FireBullet(BulletPrefab, transform.position, worldPosition - transform.position, false);
     }
 
+    public void SetCanClimb(bool can, Ladder lad)
+    {
+        canClimb = can;
+        if (can) currentLadder = lad;
+    }
+
+    public void HandleLadderExit(Ladder lad)
+    {
+        if (currentLadder == lad)
+        {
+            canClimb = false;
+            currentLadder = null;
+            if (isClimbing)
+            {
+                StopClimbing();
+                if (Input.GetAxisRaw("Vertical") > 0)
+                {
+                    rb.velocity = new Vector2(rb.velocity.x, jumpForce * 0.5f);
+                    isJumping = true;
+                }
+            }
+        }
+    }
+
+    private void StartClimbing()
+    {
+        isClimbing = true;
+        hasDoubleJumped = false;
+        rb.velocity = Vector2.zero;
+        transform.position = new Vector3(currentLadder.GetCenterX(), transform.position.y, transform.position.z);
+    }
+
+    private void StopClimbing()
+    {
+        isClimbing = false;
+    }
+
+    public void ApplyDamageAndStun(float damageAmount, float stunTime)
+    {
+        Hurt(damageAmount);
+        StartCoroutine(StunRoutine(stunTime));
+    }
+
+    private IEnumerator StunRoutine(float time)
+    {
+        isStunned = true;
+        horizontalInput = 0f;
+
+        if (isClimbing)
+        {
+            StopClimbing();
+        }
+
+        yield return new WaitForSeconds(time);
+        isStunned = false;
+    }
+
     void Update()
     {
         if (isStunned) return;
@@ -237,26 +305,65 @@ public class MCController : MonoBehaviour
             if (Input.GetKeyDown(KeyCode.M))
                 UIController.instance.ToggleMinimap();
 
-            if (Input.GetKeyDown(KeyCode.W))
+            if (canClimb && !isClimbing && (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)))
             {
-                jumpBufferCounter = jumpBufferTime;
+                StartClimbing();
+            }
 
-                if (coyoteTimeCounter <= 0f && GameController.instance.CanDoubleJump && !hasDoubleJumped && timeSinceLastJump >= doubleJumpCooldown)
+            if (isClimbing)
+            {
+                if (currentLadder != null)
+                    transform.position = new Vector3(currentLadder.GetCenterX(), transform.position.y, transform.position.z);
+
+                if (Input.GetKeyDown(KeyCode.Space))
                 {
-                    PerformDoubleJump();
-                    jumpBufferCounter = 0f;
+                    if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow))
+                    {
+                        StopClimbing();
+                    }
+                    else if (horizontalInput != 0)
+                    {
+                        StopClimbing();
+                        rb.velocity = new Vector2(Mathf.Sign(horizontalInput) * moveSpeed, jumpForce);
+                        isJumping = true;
+                        jumpBufferCounter = 0f;
+                        coyoteTimeCounter = 0f;
+                        timeSinceLastJump = 0f;
+                    }
+                    else
+                    {
+                        StopClimbing();
+                        rb.velocity = new Vector2(0f, jumpForce);
+                        isJumping = true;
+                        jumpBufferCounter = 0f;
+                        coyoteTimeCounter = 0f;
+                        timeSinceLastJump = 0f;
+                    }
                 }
             }
             else
             {
-                jumpBufferCounter -= Time.deltaTime;
-            }
-
-            if (Input.GetKeyUp(KeyCode.W))
-            {
-                if (rb.velocity.y > 0)
+                if (Input.GetKeyDown(KeyCode.Space))
                 {
-                    rb.velocity = new Vector2(rb.velocity.x, rb.velocity.y * 0.5f);
+                    jumpBufferCounter = jumpBufferTime;
+
+                    if (coyoteTimeCounter <= 0f && GameController.instance.CanDoubleJump && !hasDoubleJumped && timeSinceLastJump >= doubleJumpCooldown)
+                    {
+                        PerformDoubleJump();
+                        jumpBufferCounter = 0f;
+                    }
+                }
+                else
+                {
+                    jumpBufferCounter -= Time.deltaTime;
+                }
+
+                if (Input.GetKeyUp(KeyCode.Space))
+                {
+                    if (rb.velocity.y > 0)
+                    {
+                        rb.velocity = new Vector2(rb.velocity.x, rb.velocity.y * 0.5f);
+                    }
                 }
             }
 
@@ -269,7 +376,7 @@ public class MCController : MonoBehaviour
         else
             coyoteTimeCounter -= Time.deltaTime;
 
-        if (jumpBufferCounter > 0f && coyoteTimeCounter > 0f)
+        if (!isClimbing && jumpBufferCounter > 0f && coyoteTimeCounter > 0f)
             PerformJump();
     }
 
@@ -280,8 +387,20 @@ public class MCController : MonoBehaviour
 
         if (isStunned)
         {
-            rb.velocity = new Vector2(0, rb.velocity.y);
             ModifyPhysics();
+            return;
+        }
+
+        if (isClimbing)
+        {
+            rb.gravityScale = 0f;
+            float verticalInput = Input.GetAxisRaw("Vertical");
+            rb.velocity = new Vector2(0f, verticalInput * climbSpeed);
+
+            if (isGrounded && verticalInput < 0)
+            {
+                StopClimbing();
+            }
             return;
         }
 
@@ -295,11 +414,22 @@ public class MCController : MonoBehaviour
         float newVelX = targetVelX;
         float newVelY = rb.velocity.y;
 
+        // 获取可能的平台或传送带速度
         Vector2 platformVel = Vector2.zero;
-        if (isGrounded && !isJumping && currentPlatform != null)
+        Vector2 trackVel = Vector2.zero;
+
+        if (isGrounded && !isJumping)
         {
-            platformVel = currentPlatform.GetVelocity();
-            newVelX += platformVel.x;
+            if (currentPlatform != null)
+            {
+                platformVel = currentPlatform.GetVelocity();
+                newVelX += platformVel.x;
+            }
+            else if (currentTrack != null)
+            {
+                trackVel = currentTrack.GetVelocity();
+                newVelX += trackVel.x;
+            }
         }
 
         if (isGrounded && !isJumping)
@@ -310,6 +440,7 @@ public class MCController : MonoBehaviour
             }
             else
             {
+                // 仅当踩在Platform上时，Y轴紧贴平台。传送带只影响X轴，不干扰Y轴。
                 if (currentPlatform != null)
                 {
                     newVelY = platformVel.y;
@@ -336,6 +467,15 @@ public class MCController : MonoBehaviour
         isJumping = true;
         timeSinceLastJump = 0f;
         rb.velocity = new Vector2(rb.velocity.x, jumpForce);
+        jumpBufferCounter = 0f;
+        coyoteTimeCounter = 0f;
+    }
+
+    public void Superjump(float jf)
+    {
+        isJumping = true;
+        timeSinceLastJump = 0f;
+        rb.velocity = new Vector2(rb.velocity.x, jf);
         jumpBufferCounter = 0f;
         coyoteTimeCounter = 0f;
     }
@@ -384,7 +524,18 @@ public class MCController : MonoBehaviour
         {
             isGrounded = true;
             hasDoubleJumped = false;
+
+            // 核心修改：判断脚底下是Platform还是Track（互斥设计）
             currentPlatform = hitCollider.GetComponent<Platform>();
+            if (currentPlatform != null)
+            {
+                currentTrack = null;
+            }
+            else
+            {
+                currentTrack = hitCollider.GetComponent<Track>();
+            }
+
             if (rb.velocity.y <= 0.1f)
             {
                 isJumping = false;
@@ -394,6 +545,7 @@ public class MCController : MonoBehaviour
         {
             isGrounded = false;
             currentPlatform = null;
+            currentTrack = null;
         }
 
         CheckSlope();
@@ -440,6 +592,7 @@ public class MCController : MonoBehaviour
         firecd = 0f;
         rb.velocity = Vector2.zero;
         isStunned = false;
+        isClimbing = false;
 
         if (isDropped)
             transform.position = lastSafePosition;

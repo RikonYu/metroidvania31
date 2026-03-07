@@ -16,7 +16,7 @@ public class ChargeDoor : MonoBehaviour
         
     }
 
-    public void Break()
+    public void Blast()
     {
         Destroy(gameObject);
     }

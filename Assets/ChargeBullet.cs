@@ -16,10 +16,9 @@ public class ChargeBullet : Bullet
     protected override void OnTriggerEnter2D(Collider2D collision)
     {
         base.OnTriggerEnter2D(collision);
-        print(collision.gameObject.GetComponent<ChargeDoor>());
         if (collision.gameObject.GetComponent<ChargeDoor>() != null)
         {
-            collision.gameObject.GetComponent<ChargeDoor>().Break();
+            collision.gameObject.GetComponent<ChargeDoor>().Blast();
             ReturnToPool();
         }
     }

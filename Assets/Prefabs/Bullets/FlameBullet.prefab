@@ -137,11 +137,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   IsEnemy: 0
-  Speed: 0
-  Damage: 0
-  Duration: 0
-  CoolDown: 0
-  MaxBounceCount: 3
+  Speed: 15
+  Damage: 0.2
+  Duration: 1
+  CoolDown: 0.1
+  MaxBounceCount: 0
   MinSpeedThreshold: 1
-  EnergyCost: 10
+  EnergyCost: 0.5
   PoolKey: 

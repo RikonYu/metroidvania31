@@ -59,12 +59,8 @@ public class Minimap : MonoBehaviour
         {
             gridParent = transform.Find("GridParent");
         }
-        
-        if (player == null)
-        {
-            GameObject p = GameObject.FindGameObjectWithTag("Player");
-            if (p != null) player = p.transform;
-        }
+
+        player = GameController.instance.mc.transform;
 
         if (GameController.instance != null)
         {
@@ -112,12 +108,6 @@ public class Minimap : MonoBehaviour
     [ContextMenu("Generate Map")]
     public void GenerateMap()
     {
-        if (GameController.instance == null || GameController.instance.Rooms == null)
-        {
-            Debug.LogWarning("GameController instance or Rooms list is missing.");
-            return;
-        }
-
         Room[] allRooms = GameController.instance.Rooms.ToArray();
         
         if (allRooms.Length == 0) return;
@@ -153,6 +143,8 @@ public class Minimap : MonoBehaviour
 
             int gridX = Mathf.RoundToInt((roomWorldPos.x - mapMinX) / blockWidthWorld);
             int gridY = Mathf.RoundToInt((mapMaxY - roomWorldPos.y) / blockHeightWorld);
+
+            //Debug.Log($"{roomWorldPos.x},{roomWorldPos.y}->{gridX},{gridY}, {roomGridSize}");
 
             MinimapNode node = new MinimapNode
             {
@@ -213,7 +205,7 @@ public class Minimap : MonoBehaviour
                         rect.sizeDelta = new Vector2(uiCellSize, uiCellSize);
                         
                         float posX = cellKey.x * uiCellSize;
-                        float posY = -cellKey.y * uiCellSize;
+                        float posY = -(cellKey.y-node.gridSize.y) * uiCellSize;
                         
                         rect.anchoredPosition = new Vector2(posX, posY);
                     }
