@@ -13,7 +13,7 @@ public class Trap : MonoBehaviour
     public float damage = 10f;
     public float stunDuration = 0.5f;
     public float knockbackForce = 15f;
-
+    Animator anim;
     float t;
     bool isUp = true;
     BoxCollider2D hurtbox;
@@ -25,6 +25,7 @@ public class Trap : MonoBehaviour
         hurtbox.size = gameObject.GetComponent<SpriteRenderer>().size;
         ds = transform.Find("BaseSprite").GetComponent<SpriteRenderer>();
         ds.size = gameObject.GetComponent<SpriteRenderer>().size;
+        anim = gameObject.GetComponent<Animator>();
     }
 
     void Update()
@@ -36,8 +37,19 @@ public class Trap : MonoBehaviour
             isUp = !isUp;
             hurtbox.enabled = isUp;
             gameObject.GetComponent<SpriteRenderer>().enabled = isUp;
-            if(isUp)t = UpTime;
-            else t = DownTime;
+            if (isUp)
+            {
+                t = UpTime;
+                anim.Play("trap", 0, 0f);
+                anim.speed = 1.0f;
+            }
+
+            else
+            {
+                anim.Play("trap", 0, 1f);
+                anim.speed = -1.0f;
+                t = DownTime;
+            }
         }
     }
 

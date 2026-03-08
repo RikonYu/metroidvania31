@@ -313,6 +313,7 @@ public class MCController : MonoBehaviour
 
     void Update()
     {
+        UIController.instance.SetEnergy(this.CurrentEnergy, this.MaxEnergy);
         if (isStunned) return;
 
         if (freezeCounter > 0f) freezeCounter -= Time.deltaTime;

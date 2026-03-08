@@ -6,10 +6,12 @@ public class UIController : MonoBehaviour
 {
     public static UIController instance;
 
-    public float HPLenUnit;
-    public GameObject HPParent;
+    public float HPLenUnit, EnergyLenUnit;
+    public GameObject HPParent, AMParent;
     public GameObject BossHPParent;
-    GameObject HP, HPBG;
+    GameObject HP, HPBG, HPB;
+    GameObject AM, AMBG, AMB;
+
     GameObject BOSSHP;
 
     public GameObject MinimapBG;
@@ -20,6 +22,11 @@ public class UIController : MonoBehaviour
         instance = this;
         HP = HPParent.transform.Find("hp").gameObject;
         HPBG = HPParent.transform.Find("bg").gameObject;
+        HPB = HPParent.transform.Find("border").gameObject;
+        AM = AMParent.transform.Find("hp").gameObject;
+        AMBG = AMParent.transform.Find("bg").gameObject;
+        AMB = AMParent.transform.Find("border").gameObject;
+
         BOSSHP = BossHPParent.transform.Find("hp").gameObject;
         SetBossHP(20, 50);
     }
@@ -39,7 +46,14 @@ public class UIController : MonoBehaviour
     {
         HP.GetComponent<RectTransform>().sizeDelta = new Vector2(HPLenUnit * currenthp, 100f);
         HPBG.GetComponent<RectTransform>().sizeDelta = new Vector2(HPLenUnit * maxhp, 100f);
+        HPB.GetComponent<RectTransform>().sizeDelta = new Vector2(HPLenUnit * maxhp+200f, 200f);
+    }
 
+    public void SetEnergy(float currentEnergy, float maxEnergy)
+    {
+        AM.GetComponent<RectTransform>().sizeDelta = new Vector2(EnergyLenUnit * currentEnergy, 100f);
+        AMBG.GetComponent<RectTransform>().sizeDelta = new Vector2(EnergyLenUnit * maxEnergy, 100f);
+        AMB.GetComponent<RectTransform>().sizeDelta = new Vector2(EnergyLenUnit * maxEnergy + 200f, 200f);
     }
     public void SetBossHP(float currenthp, float maxhp)
     {
