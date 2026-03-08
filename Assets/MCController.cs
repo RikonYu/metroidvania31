@@ -26,6 +26,18 @@ public class MCController : MonoBehaviour
     [Header("Movement")]
     [SerializeField] private float moveSpeed = 8f;
 
+    [Header("Slide System")]
+    [SerializeField] private float slideSpeed = 15f;
+    [SerializeField] private float slideDuration = 0.4f;
+    [SerializeField] private float slideCooldown = 0.8f;
+    public bool isSliding { get; private set; }
+    private float slideCooldownCounter;
+    private float currentSlideDir = 1f;
+    private Collider2D playerCollider;
+    private Vector2 origColliderSize;
+    private Vector2 origColliderOffset;
+    private SpriteRenderer spriteRenderer;
+
     [Header("Climbing System")]
     [SerializeField] private float climbSpeed = 4f;
     private bool isClimbing;
@@ -69,7 +81,6 @@ public class MCController : MonoBehaviour
     private bool isStunned;
     private Vector3 lastSafePosition;
 
-    // 互斥的地面类型记录
     private Platform currentPlatform;
     private Track currentTrack;
 
@@ -81,13 +92,26 @@ public class MCController : MonoBehaviour
         rb.freezeRotation = true;
         rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
 
-        Collider2D coll = GetComponent<Collider2D>();
-        if (coll != null)
+        spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+
+        playerCollider = GetComponent<Collider2D>();
+        if (playerCollider != null)
         {
             PhysicsMaterial2D noFrictionMat = new PhysicsMaterial2D("NoFriction");
             noFrictionMat.friction = 0f;
             noFrictionMat.bounciness = 0f;
-            coll.sharedMaterial = noFrictionMat;
+            playerCollider.sharedMaterial = noFrictionMat;
+
+            if (playerCollider is BoxCollider2D box)
+            {
+                origColliderSize = box.size;
+                origColliderOffset = box.offset;
+            }
+            else if (playerCollider is CapsuleCollider2D cap)
+            {
+                origColliderSize = cap.size;
+                origColliderOffset = cap.offset;
+            }
         }
 
         lastSafePosition = transform.position;
@@ -270,7 +294,10 @@ public class MCController : MonoBehaviour
     public void ApplyDamageAndStun(float damageAmount, float stunTime)
     {
         Hurt(damageAmount);
-        StartCoroutine(StunRoutine(stunTime));
+        if (!isSliding)
+        {
+            StartCoroutine(StunRoutine(stunTime));
+        }
     }
 
     private IEnumerator StunRoutine(float time)
@@ -278,10 +305,7 @@ public class MCController : MonoBehaviour
         isStunned = true;
         horizontalInput = 0f;
 
-        if (isClimbing)
-        {
-            StopClimbing();
-        }
+        if (isClimbing) StopClimbing();
 
         yield return new WaitForSeconds(time);
         isStunned = false;
@@ -290,14 +314,25 @@ public class MCController : MonoBehaviour
     void Update()
     {
         if (isStunned) return;
+
         if (freezeCounter > 0f) freezeCounter -= Time.deltaTime;
         firecd -= Time.deltaTime;
-
         timeSinceLastJump += Time.deltaTime;
 
         if (freezeCounter <= 0f)
         {
             horizontalInput = Input.GetAxisRaw("Horizontal");
+            if (horizontalInput != 0 && spriteRenderer != null)
+            {
+                spriteRenderer.flipX = horizontalInput < 0;
+            }
+
+            if (GameController.instance.CanSlide&& Input.GetKeyDown(KeyCode.Q) && !isSliding && slideCooldownCounter <= 0f && !isClimbing)
+            {
+                StartCoroutine(SlideRoutine());
+            }
+
+            if (isSliding) return;
 
             if (Input.GetKeyDown(KeyCode.E))
                 GameController.instance.InteractingObject?.Interact();
@@ -408,13 +443,74 @@ public class MCController : MonoBehaviour
         ModifyPhysics();
     }
 
+    private IEnumerator SlideRoutine()
+    {
+        isSliding = true;
+        slideCooldownCounter = slideDuration;
+        if (spriteRenderer != null)
+        {
+            currentSlideDir = spriteRenderer.flipX ? -1f : 1f;
+        }
+
+        if (playerCollider is BoxCollider2D box)
+        {
+            box.size = new Vector2(origColliderSize.x, origColliderSize.y / 2f);
+            box.offset = new Vector2(origColliderOffset.x, origColliderOffset.y - origColliderSize.y / 4f);
+        }
+        else if (playerCollider is CapsuleCollider2D cap)
+        {
+            cap.size = new Vector2(origColliderSize.x, origColliderSize.y / 2f);
+            cap.offset = new Vector2(origColliderOffset.x, origColliderOffset.y - origColliderSize.y / 4f);
+        }
+
+
+        while (HasCeiling() || slideCooldownCounter>0f)
+        {
+
+            slideCooldownCounter -= Time.deltaTime;
+            yield return null;
+        }
+
+        if (playerCollider is BoxCollider2D boxRestore)
+        {
+            boxRestore.size = origColliderSize;
+            boxRestore.offset = origColliderOffset;
+        }
+        else if (playerCollider is CapsuleCollider2D capRestore)
+        {
+            capRestore.size = origColliderSize;
+            capRestore.offset = origColliderOffset;
+        }
+
+        isSliding = false;
+        
+        rb.velocity = new Vector2(rb.velocity.x, 0f);
+    }
+
+    private bool HasCeiling()
+    {
+        Vector2 scale = transform.lossyScale;
+        Vector2 worldSize = new Vector2(origColliderSize.x * Mathf.Abs(scale.x), origColliderSize.y * Mathf.Abs(scale.y));
+        Vector2 worldOffset = new Vector2(origColliderOffset.x * scale.x, origColliderOffset.y * scale.y);
+
+        Vector2 checkPos = (Vector2)transform.position + worldOffset + new Vector2(0f, worldSize.y / 4f);
+        Vector2 checkSize = new Vector2(worldSize.x * 0.7f, worldSize.y * 0.45f);
+
+        Collider2D hit = Physics2D.OverlapBox(checkPos, checkSize, 0f, groundLayer);
+        return hit != null;
+    }
+
     private void Move()
     {
-        float targetVelX = horizontalInput * moveSpeed;
+        float targetVelX = isSliding ? currentSlideDir * slideSpeed : horizontalInput * moveSpeed;
         float newVelX = targetVelX;
         float newVelY = rb.velocity.y;
 
-        // 获取可能的平台或传送带速度
+        if (isSliding && isGrounded)
+        {
+            newVelY = 0f;
+        }
+
         Vector2 platformVel = Vector2.zero;
         Vector2 trackVel = Vector2.zero;
 
@@ -432,30 +528,39 @@ public class MCController : MonoBehaviour
             }
         }
 
-        if (isGrounded && !isJumping)
+        if (!isSliding)
         {
-            if (isOnSlope)
+            if (isGrounded && !isJumping)
             {
-                newVelY = targetVelX * (-slopeNormal.x / slopeNormal.y);
-            }
-            else
-            {
-                // 仅当踩在Platform上时，Y轴紧贴平台。传送带只影响X轴，不干扰Y轴。
-                if (currentPlatform != null)
+                if (isOnSlope)
                 {
-                    newVelY = platformVel.y;
+                    newVelY = targetVelX * (-slopeNormal.x / slopeNormal.y);
                 }
-                else if (newVelY > 0)
+                else
+                {
+                    if (currentPlatform != null)
+                    {
+                        newVelY = platformVel.y;
+                    }
+                    else if (newVelY > 0)
+                    {
+                        newVelY = 0f;
+                    }
+                }
+            }
+            else if (wasGrounded && !isGrounded && !isJumping)
+            {
+                if (newVelY > 0)
                 {
                     newVelY = 0f;
                 }
             }
         }
-        else if (wasGrounded && !isGrounded && !isJumping)
+        else
         {
-            if (newVelY > 0)
+            if (isGrounded && currentPlatform != null)
             {
-                newVelY = 0f;
+                newVelY = platformVel.y;
             }
         }
 
@@ -525,7 +630,6 @@ public class MCController : MonoBehaviour
             isGrounded = true;
             hasDoubleJumped = false;
 
-            // 核心修改：判断脚底下是Platform还是Track（互斥设计）
             currentPlatform = hitCollider.GetComponent<Platform>();
             if (currentPlatform != null)
             {
@@ -593,6 +697,7 @@ public class MCController : MonoBehaviour
         rb.velocity = Vector2.zero;
         isStunned = false;
         isClimbing = false;
+        if (isSliding) isSliding = false;
 
         if (isDropped)
             transform.position = lastSafePosition;
@@ -606,6 +711,8 @@ public class MCController : MonoBehaviour
 
     public void Hurt(float dmg)
     {
+        if (isSliding) return;
+
         CurrentHealth -= dmg;
         if (CurrentHealth <= 0f) CurrentHealth = 0f;
         UIController.instance.SetHP(CurrentHealth, MaxHealth);
@@ -624,6 +731,14 @@ public class MCController : MonoBehaviour
 
             Gizmos.color = Color.yellow;
             Gizmos.DrawLine(groundCheck.position + Vector3.up * 0.1f, groundCheck.position + Vector3.down * 0.3f);
+        }
+
+        if (origColliderSize != Vector2.zero)
+        {
+            Gizmos.color = Color.cyan;
+            Vector2 checkPos = (Vector2)transform.position + origColliderOffset + new Vector2(0f, origColliderSize.y / 4f);
+            Vector2 checkSize = new Vector2(origColliderSize.x * 0.8f, origColliderSize.y * 0.45f);
+            Gizmos.DrawWireCube(checkPos, checkSize);
         }
     }
 }

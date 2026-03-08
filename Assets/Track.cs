@@ -7,7 +7,10 @@ public class Track : MonoBehaviour
     public float MoveSpeed;
     public bool IsLeft;
 
-
+    private void Start()
+    {
+        GetComponent<SpriteRenderer>().flipX = IsLeft;
+    }
     void Update()
     {
 

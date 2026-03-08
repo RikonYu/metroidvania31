@@ -57,6 +57,10 @@ MonoBehaviour:
   BulletPrefab: {fileID: 0}
   IsInSpace: 0
   moveSpeed: 8
+  slideSpeed: 25
+  slideDuration: 0.15
+  slideCooldown: 1
+  climbSpeed: 4
   jumpForce: 16
   baseGravityScale: 4
   baseSpaceGravityScale: 0.5

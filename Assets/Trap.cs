@@ -7,6 +7,8 @@ public class Trap : MonoBehaviour
     public float UpTime;
     public float DownTime;
 
+
+
     [Header("Trap Effects")]
     public float damage = 10f;
     public float stunDuration = 0.5f;

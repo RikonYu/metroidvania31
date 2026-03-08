@@ -97,6 +97,7 @@ GameObject:
   - component: {fileID: 6481068641967511881}
   - component: {fileID: 6481068641967511882}
   - component: {fileID: 8864721999196886679}
+  - component: {fileID: 6868799888577902196}
   m_Layer: 14
   m_Name: Trap
   m_TagString: Untagged
@@ -162,7 +163,7 @@ SpriteRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 1
   m_Sprite: {fileID: 7482667652216324306, guid: 311925a002f4447b3a28927169b83ea6, type: 3}
-  m_Color: {r: 1, g: 0, b: 0, a: 1}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 2
@@ -227,3 +228,23 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 671d7b470a6b4b646ae108ef03fc2db3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!95 &6868799888577902196
+Animator:
+  serializedVersion: 4
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6481068641967511883}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 9100000, guid: 32274124c19208d41949a3e33fc1d5ad, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorControllerStateOnDisable: 0
