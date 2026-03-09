@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 5916162496152676137}
   - component: {fileID: 1790471755}
   - component: {fileID: -245710558622597618}
+  - component: {fileID: -4045182863354809426}
   m_Layer: 7
   m_Name: ChargeDoor
   m_TagString: Untagged
@@ -56,7 +57,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
+  - {fileID: 2100000, guid: 5e55371413d2040498fe1c9017adec62, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -77,8 +78,8 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
-  m_Sprite: {fileID: 7482667652216324306, guid: 311925a002f4447b3a28927169b83ea6, type: 3}
-  m_Color: {r: 0, g: 1, b: 0, a: 1}
+  m_Sprite: {fileID: 21300000, guid: cef6d0635b7fa534f9b1c030aad989bf, type: 3}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 2
@@ -156,5 +157,17 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 671d7b470a6b4b646ae108ef03fc2db3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &-4045182863354809426
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5916162496152676138}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ab642598622de5e48a01efc3c776ad58, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 

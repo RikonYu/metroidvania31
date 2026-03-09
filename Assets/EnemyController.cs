@@ -7,6 +7,7 @@ public class EnemyController : MonoBehaviour
     public float MaxHP;
     public float CurrentHP;
     public float MoveSpeed;
+    public float CollideDamage;
     public bool IsFlying;
     public GameObject Waypoints;
     public WaypointMaster wm;
@@ -63,6 +64,7 @@ public class EnemyController : MonoBehaviour
         CurrentHP -= dmg;
     }
 
+    
     public void Freeze(float duration)
     {
 

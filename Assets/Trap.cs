@@ -17,14 +17,11 @@ public class Trap : MonoBehaviour
     float t;
     bool isUp = true;
     BoxCollider2D hurtbox;
-    SpriteRenderer ds;
 
     void Start()
     {
         hurtbox = gameObject.GetComponent<BoxCollider2D>();
         hurtbox.size = gameObject.GetComponent<SpriteRenderer>().size;
-        ds = transform.Find("BaseSprite").GetComponent<SpriteRenderer>();
-        ds.size = gameObject.GetComponent<SpriteRenderer>().size;
         anim = gameObject.GetComponent<Animator>();
     }
 
