@@ -15,8 +15,10 @@ public enum EnemyState
 public class EnemyAI : MonoBehaviour
 {
     protected EnemyController controller;
-    private Rigidbody2D rb;
-    private Transform playerTransform;
+    protected Rigidbody2D rb;
+    protected Transform playerTransform;
+
+    public GameObject Bullet;
 
     [Header("Phase Settings")]
     public int StageNum;
@@ -25,7 +27,7 @@ public class EnemyAI : MonoBehaviour
 
     [Header("AI State")]
     [SerializeField]
-    private EnemyState currentState = EnemyState.Patrol;
+    protected EnemyState currentState = EnemyState.Patrol;
 
     [Header("Detection Settings")]
     [Range(0, 360)]
@@ -36,25 +38,25 @@ public class EnemyAI : MonoBehaviour
 
     [Header("Transition Settings")]
     public float alertDuration = 0.8f;
-    private float alertTimer;
+    protected float alertTimer;
     public float prepareAttackDuration = 0.5f;
-    private float prepareAttackTimer;
+    protected float prepareAttackTimer;
 
     [Header("Combat Settings")]
     public float attackRange = 1.5f;
     public float attackCooldown = 2.0f;
-    private float lastAttackTime;
+    protected float lastAttackTime;
 
     [Header("Patrol Settings")]
     public float waypointTolerance = 0.5f;
     public float searchWaitTime = 2.0f;
-    private float searchTimer;
-    private int currentWaypointIndex = 0;
-    private List<Vector3> waypoints;
+    protected float searchTimer;
+    protected int currentWaypointIndex = 0;
+    protected List<Vector3> waypoints;
 
-    private Vector2 moveInput;
+    protected Vector2 moveInput;
 
-    void Start()
+    protected virtual void Start()
     {
         controller = GetComponent<EnemyController>();
         rb = GetComponent<Rigidbody2D>();
@@ -72,7 +74,7 @@ public class EnemyAI : MonoBehaviour
         }
     }
 
-    void Update()
+    protected virtual void Update()
     {
         for (int i = StageNum - 1; i >= 0; i--)
         {
@@ -287,6 +289,8 @@ public class EnemyAI : MonoBehaviour
 
     protected virtual void Attack()
     {
+        var firepos = transform.Find("firespot").position;
+        GameController.instance.FireBullet(Bullet, firepos, GameController.instance.mc.transform.position - firepos, true);
     }
 
     int GetClosestWaypointIndex()

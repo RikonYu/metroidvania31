@@ -109,7 +109,6 @@ public class Bullet : MonoBehaviour
 
     protected virtual void OnTriggerEnter2D(Collider2D collision)
     {
-        Debug.Log(collision.gameObject);
         if (IsEnemy)
         {
             MCController mc = collision.gameObject.GetComponent<MCController>();

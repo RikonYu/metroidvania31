@@ -1,7 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-
+using TMPro;
 public class UIController : MonoBehaviour
 {
     public static UIController instance;
@@ -28,7 +28,7 @@ public class UIController : MonoBehaviour
         AMB = AMParent.transform.Find("border").gameObject;
 
         BOSSHP = BossHPParent.transform.Find("hp").gameObject;
-        SetBossHP(20, 50);
+        BossHPParent.SetActive(false);
     }
 
 
@@ -55,9 +55,21 @@ public class UIController : MonoBehaviour
         AMBG.GetComponent<RectTransform>().sizeDelta = new Vector2(EnergyLenUnit * maxEnergy, 100f);
         AMB.GetComponent<RectTransform>().sizeDelta = new Vector2(EnergyLenUnit * maxEnergy + 200f, 200f);
     }
+    public void HideBossHP()
+    {
+
+        BossHPParent.SetActive(false);
+    }
+    public void ShowBossHP(string name, float maxhp)
+    {
+
+        BossHPParent.SetActive(true);
+        BossHPParent.transform.Find("text").GetComponent<TMP_Text>().text = name;
+        SetBossHP(maxhp, maxhp);
+
+    }
     public void SetBossHP(float currenthp, float maxhp)
     {
-        BossHPParent.SetActive(true);
         HP.GetComponent<RectTransform>().sizeDelta = new Vector2(HPLenUnit * currenthp, 100f);
         HPBG.GetComponent<RectTransform>().sizeDelta = new Vector2(HPLenUnit * maxhp, 100f);
         BOSSHP.GetComponent<RectTransform>().sizeDelta = new Vector2(1600f * currenthp / maxhp, 100f);

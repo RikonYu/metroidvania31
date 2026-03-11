@@ -22,6 +22,8 @@ public class EnemyController : MonoBehaviour
         wm = Waypoints.GetComponent<WaypointMaster>();
         transform.parent.gameObject.GetComponent<Room>().Enemies.Add(this);
         GameController.instance.AllEnemies.Add(this);
+        if (IsFlying)
+            GetComponent<Rigidbody2D>().gravityScale = 0f;
     }
     public void Respawn()
     {
