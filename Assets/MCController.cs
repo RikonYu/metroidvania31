@@ -50,6 +50,11 @@ public class MCController : MonoBehaviour
     [SerializeField] private float baseSpaceGravityScale = 0.5f;
     [SerializeField] private float maxFallSpeed = 25f;
 
+    [Header("Drop Down System")]
+    [SerializeField] private float dropDownDuration = 0.4f;
+    private Collider2D currentOneWayPlatform;
+    private bool isDroppingDown;
+
     [Header("Game Feel")]
     [SerializeField] private float coyoteTime = 0.1f;
     [SerializeField] private float jumpBufferTime = 0.1f;
@@ -85,6 +90,7 @@ public class MCController : MonoBehaviour
     private Track currentTrack;
 
     float freezeCounter;
+    float slidetime;
 
     void Start()
     {
@@ -313,10 +319,12 @@ public class MCController : MonoBehaviour
 
     void Update()
     {
+        Debug.Log(currentOneWayPlatform);
         UIController.instance.SetEnergy(this.CurrentEnergy, this.MaxEnergy);
         if (isStunned) return;
 
         if (freezeCounter > 0f) freezeCounter -= Time.deltaTime;
+        if (slideCooldownCounter > 0f) slideCooldownCounter -= Time.deltaTime;
         firecd -= Time.deltaTime;
         timeSinceLastJump += Time.deltaTime;
 
@@ -328,7 +336,7 @@ public class MCController : MonoBehaviour
                 spriteRenderer.flipX = horizontalInput < 0;
             }
 
-            if (GameController.instance.CanSlide&& Input.GetKeyDown(KeyCode.Q) && !isSliding && slideCooldownCounter <= 0f && !isClimbing)
+            if (GameController.instance.CanSlide && Input.GetKeyDown(KeyCode.Q) && !isSliding && slideCooldownCounter <= 0f && !isClimbing)
             {
                 StartCoroutine(SlideRoutine());
             }
@@ -356,6 +364,11 @@ public class MCController : MonoBehaviour
                     if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow))
                     {
                         StopClimbing();
+                        // 向下跳逻辑：如果在梯子上按下S+Space，且梯子底部有单向平台，则穿透
+                        if (currentOneWayPlatform != null)
+                        {
+                            StartCoroutine(DropDownRoutine(currentOneWayPlatform));
+                        }
                     }
                     else if (horizontalInput != 0)
                     {
@@ -381,12 +394,20 @@ public class MCController : MonoBehaviour
             {
                 if (Input.GetKeyDown(KeyCode.Space))
                 {
-                    jumpBufferCounter = jumpBufferTime;
-
-                    if (coyoteTimeCounter <= 0f && GameController.instance.CanDoubleJump && !hasDoubleJumped && timeSinceLastJump >= doubleJumpCooldown)
+                    // 向下跳逻辑：在单向平台上按下S+Space，忽略跳跃并直接下落
+                    if ((Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) && currentOneWayPlatform != null)
                     {
-                        PerformDoubleJump();
-                        jumpBufferCounter = 0f;
+                        StartCoroutine(DropDownRoutine(currentOneWayPlatform));
+                    }
+                    else
+                    {
+                        jumpBufferCounter = jumpBufferTime;
+
+                        if (coyoteTimeCounter <= 0f && GameController.instance.CanDoubleJump && !hasDoubleJumped && timeSinceLastJump >= doubleJumpCooldown)
+                        {
+                            PerformDoubleJump();
+                            jumpBufferCounter = 0f;
+                        }
                     }
                 }
                 else
@@ -444,10 +465,27 @@ public class MCController : MonoBehaviour
         ModifyPhysics();
     }
 
+    private IEnumerator DropDownRoutine(Collider2D platformCollider)
+    {
+        Debug.Log($"dropping, {playerCollider}, {platformCollider}");
+        if (playerCollider == null || platformCollider == null) yield break;
+        isDroppingDown = true;
+        Physics2D.IgnoreCollision(playerCollider, platformCollider, true);
+
+        yield return new WaitForSeconds(dropDownDuration);
+
+        if (playerCollider != null && platformCollider != null)
+        {
+            Physics2D.IgnoreCollision(playerCollider, platformCollider, false);
+        }
+        isDroppingDown = false;
+    }
+
     private IEnumerator SlideRoutine()
     {
         isSliding = true;
-        slideCooldownCounter = slideDuration;
+        slideCooldownCounter = slideCooldown;
+        slidetime = slideDuration;
         if (spriteRenderer != null)
         {
             currentSlideDir = spriteRenderer.flipX ? -1f : 1f;
@@ -464,11 +502,10 @@ public class MCController : MonoBehaviour
             cap.offset = new Vector2(origColliderOffset.x, origColliderOffset.y - origColliderSize.y / 4f);
         }
 
-
-        while (HasCeiling() || slideCooldownCounter>0f)
+        while (HasCeiling() || slidetime > 0f)
         {
 
-            slideCooldownCounter -= Time.deltaTime;
+            slidetime -= Time.deltaTime;
             yield return null;
         }
 
@@ -484,7 +521,7 @@ public class MCController : MonoBehaviour
         }
 
         isSliding = false;
-        
+
         rb.velocity = new Vector2(rb.velocity.x, 0f);
     }
 
@@ -619,6 +656,15 @@ public class MCController : MonoBehaviour
 
     private void CheckGround()
     {
+        if (isDroppingDown)
+        {
+            wasGrounded = isGrounded;
+            isGrounded = false;
+            currentPlatform = null;
+            currentTrack = null;
+            currentOneWayPlatform = null;
+            return;
+        }
         wasGrounded = isGrounded;
 
         float safeWidth = Mathf.Max(0.01f, groundCheckWidth - 0.05f);
@@ -641,6 +687,16 @@ public class MCController : MonoBehaviour
                 currentTrack = hitCollider.GetComponent<Track>();
             }
 
+            if (hitCollider.GetComponent<PlatformEffector2D>() != null)
+            {
+                currentOneWayPlatform = hitCollider;
+            }
+            else
+            {
+                currentOneWayPlatform = null;
+            }
+            // ---------------------------
+
             if (rb.velocity.y <= 0.1f)
             {
                 isJumping = false;
@@ -651,6 +707,7 @@ public class MCController : MonoBehaviour
             isGrounded = false;
             currentPlatform = null;
             currentTrack = null;
+            currentOneWayPlatform = null;
         }
 
         CheckSlope();

@@ -48,8 +48,11 @@ public class GameController : MonoBehaviour
     }
     public void ActivateRoom(Room des)
     {
+        
         if (des.IsBossRoom)
+        {
             UIController.instance.ShowBossHP(des.Enemies[0].name, des.Enemies[0].MaxHP);
+        }
         else
             UIController.instance.HideBossHP();
         ActiveRoom.Deactivate();

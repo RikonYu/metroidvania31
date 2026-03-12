@@ -15,11 +15,13 @@ public class Room : MonoBehaviour
     public Vector2 cameraCenterOffset;
     float diffX = 0f;
     float diffY = 0f;
+    public bool Visited;
 
     public GameObject BossBound;
 
     void Awake()
     {
+        Visited = false;
         float maxTileX = Tiles.transform.position.x + Tiles.localBounds.max.x;
         float maxTileY = Tiles.transform.position.y + Tiles.localBounds.max.y;
 
@@ -53,11 +55,6 @@ public class Room : MonoBehaviour
         return new Vector2Int(Mathf.RoundToInt(diffX / 32f), Mathf.RoundToInt(diffY / 18f));
     }
 
-    private void Start()
-    {
-
-    }
-
     private void Update()
     {
         if (IsBossRoom)
@@ -78,6 +75,7 @@ public class Room : MonoBehaviour
 
     public void Activate()
     {
+        Visited = true;
         gameObject.SetActive(true);
     }
 

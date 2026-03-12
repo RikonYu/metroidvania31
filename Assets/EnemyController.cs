@@ -20,6 +20,7 @@ public class EnemyController : MonoBehaviour
         AI = gameObject.GetComponent<EnemyAI>();
         StartPos = transform.position;
         wm = Waypoints.GetComponent<WaypointMaster>();
+        
         transform.parent.gameObject.GetComponent<Room>().Enemies.Add(this);
         GameController.instance.AllEnemies.Add(this);
         if (IsFlying)

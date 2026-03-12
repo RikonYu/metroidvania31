@@ -378,8 +378,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   Tiles: {fileID: 5746363185274859070}
-  Enemies:
-  - {fileID: 0}
+  Enemies: []
   roomBounds:
     m_Center: {x: 0, y: 0, z: 0}
     m_Extent: {x: 0, y: 0, z: 0}
