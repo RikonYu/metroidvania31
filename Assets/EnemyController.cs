@@ -65,6 +65,7 @@ public class EnemyController : MonoBehaviour
     public void Hurt(float dmg)
     {
         CurrentHP -= dmg;
+
     }
 
     

@@ -76,8 +76,8 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
-  m_Sprite: {fileID: -2413806693520163455, guid: ebe73ca9363db456bacf42c025bb4847, type: 3}
-  m_Color: {r: 1, g: 0, b: 0, a: 1}
+  m_Sprite: {fileID: 21300000, guid: b00c913f40477214299a9ed55243999f, type: 3}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
@@ -102,7 +102,7 @@ CircleCollider2D:
   m_UsedByComposite: 0
   m_Offset: {x: 0, y: 0}
   serializedVersion: 2
-  m_Radius: 0.5
+  m_Radius: 0.3
 --- !u!50 &5756801116924514008
 Rigidbody2D:
   serializedVersion: 4
@@ -140,8 +140,8 @@ MonoBehaviour:
   Speed: 15
   Damage: 0.2
   Duration: 1
-  CoolDown: 0.1
+  CoolDown: 0.05
   MaxBounceCount: 0
   MinSpeedThreshold: 1
-  EnergyCost: 0.5
+  EnergyCost: 1
   PoolKey: 
