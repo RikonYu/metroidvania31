@@ -319,7 +319,6 @@ public class MCController : MonoBehaviour
 
     void Update()
     {
-        Debug.Log(currentOneWayPlatform);
         UIController.instance.SetEnergy(this.CurrentEnergy, this.MaxEnergy);
         if (isStunned) return;
 

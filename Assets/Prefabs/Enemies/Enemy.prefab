@@ -100,10 +100,15 @@ MonoBehaviour:
   MaxHP: 0
   CurrentHP: 0
   MoveSpeed: 0
+  CollideDamage: 0
+  stunDuration: 0.25
+  knockbackForce: 10
   IsFlying: 0
   Waypoints: {fileID: 1558084376845915473}
   wm: {fileID: 0}
   IsBoss: 0
+  flashDuration: 0.15
+  flashColor: {r: 1, g: 1, b: 1, a: 1}
 --- !u!114 &1902633332449829949
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -116,6 +121,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a7de49f49cf21840b3d53ef63de4095, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  Bullet: {fileID: 0}
   StageNum: 0
   currentPhase: 0
   Portion:
@@ -158,7 +164,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 163069816326980511}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0.027161662}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
