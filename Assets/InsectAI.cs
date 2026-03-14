@@ -29,7 +29,9 @@ public class InsectAI : EnemyAI
     private bool hasHitPlayer;
     private int arcDirection = 1;
     private float phaseTimer;
+    private Collider2D phasedObstacle;
     private Coroutine burrowRoutine;
+    private bool spawnDirectlyInChase;
 
     protected override void Start()
     {
@@ -46,7 +48,13 @@ public class InsectAI : EnemyAI
         playerCollider = playerTransform != null ? playerTransform.GetComponent<Collider2D>() : null;
         defaultGravityScale = rb != null ? rb.gravityScale : 0f;
         defaultIsFlying = controller != null && controller.IsFlying;
-        currentState = EnemyState.Patrol;
+        currentState = spawnDirectlyInChase ? EnemyState.Chase : EnemyState.Patrol;
+        if (spawnDirectlyInChase && rb != null)
+        {
+            controller.IsFlying = true;
+            rb.gravityScale = 0f;
+            rb.velocity = Vector2.zero;
+        }
 
         if (spriteAnimator != null && spriteAnimator.runtimeAnimatorController != null)
         {
@@ -79,7 +87,7 @@ public class InsectAI : EnemyAI
         UpdateMoveState();
     }
 
-    private new void FixedUpdate()
+    private void FixedUpdate()
     {
         if (rb == null || controller == null)
         {
@@ -106,7 +114,8 @@ public class InsectAI : EnemyAI
         controller.IsFlying = true;
         rb.gravityScale = 0f;
         Move(moveAngle);
-        rb.velocity = moveInput;
+        rb.velocity = Vector2.zero;
+        rb.MovePosition(rb.position + moveInput * Time.fixedDeltaTime);
     }
 
     private void UpdateCurrentPhase()
@@ -132,6 +141,10 @@ public class InsectAI : EnemyAI
         {
             currentState = EnemyState.Chase;
             arcDirection = Random.Range(0, 2) == 0 ? -1 : 1;
+            if (rb != null)
+            {
+                rb.velocity = Vector2.zero;
+            }
             return;
         }
 
@@ -195,11 +208,39 @@ public class InsectAI : EnemyAI
         FaceByVelocity(curvedDirection.x);
     }
 
+    public void LaunchFromNest(Transform target, float signedAngle)
+    {
+        if (target != null)
+        {
+            playerTransform = target;
+        }
+
+        spawnDirectlyInChase = true;
+        currentState = EnemyState.Chase;
+        moveAngle = Mathf.Abs(signedAngle);
+        arcDirection = signedAngle < 0f ? -1 : 1;
+        if (Mathf.Abs(signedAngle) <= 0.01f)
+        {
+            arcDirection = 1;
+        }
+
+        if (controller != null)
+        {
+            controller.IsFlying = true;
+        }
+
+        if (rb != null)
+        {
+            rb.gravityScale = 0f;
+            rb.velocity = Vector2.zero;
+        }
+    }
+
     protected override void Attack()
     {
     }
 
-    protected override void OnCollisionEnter2D(Collision2D collision)
+    private void OnCollisionEnter2D(Collision2D collision)
     {
         if (TryHitPlayer(collision.gameObject))
         {
@@ -208,6 +249,7 @@ public class InsectAI : EnemyAI
 
         if (currentState != EnemyState.Patrol && IsObstacleLayer(collision.gameObject.layer))
         {
+            phasedObstacle = collision.collider;
             StartPhasing();
         }
     }
@@ -221,6 +263,7 @@ public class InsectAI : EnemyAI
 
         if (currentState != EnemyState.Patrol && IsObstacleLayer(other.gameObject.layer))
         {
+            phasedObstacle = other;
             phaseTouchedObstacle = true;
         }
     }
@@ -272,6 +315,11 @@ public class InsectAI : EnemyAI
             return false;
         }
 
+        if (spawnDirectlyInChase)
+        {
+            return true;
+        }
+
         RaycastHit2D hit = Physics2D.Linecast(transform.position, playerTransform.position, obstacleMask);
         return hit.collider == null;
     }
@@ -308,6 +356,10 @@ public class InsectAI : EnemyAI
         if (IsOverlappingObstacle())
         {
             phaseTouchedObstacle = true;
+            if (phasedObstacle == null)
+            {
+                phasedObstacle = FindCurrentObstacle();
+            }
             return;
         }
 
@@ -327,7 +379,15 @@ public class InsectAI : EnemyAI
         isPhasing = true;
         phaseTouchedObstacle = true;
         phaseTimer = minimumPhaseDuration;
+        if (phasedObstacle == null)
+        {
+            phasedObstacle = FindCurrentObstacle();
+        }
         bodyCollider.isTrigger = true;
+        if (rb != null)
+        {
+            rb.velocity = Vector2.zero;
+        }
 
         if (burrowRoutine != null)
         {
@@ -343,6 +403,11 @@ public class InsectAI : EnemyAI
             return;
         }
 
+        if (TryFindPreferredEmergencePoint(out Vector2 preferredPosition))
+        {
+            transform.position = preferredPosition;
+        }
+
         if (playerCollider != null && bodyCollider != null && bodyCollider.bounds.Intersects(playerCollider.bounds))
         {
             ResolveEmergenceOverlap();
@@ -353,6 +418,11 @@ public class InsectAI : EnemyAI
         if (bodyCollider != null)
         {
             bodyCollider.isTrigger = false;
+        }
+        phasedObstacle = null;
+        if (rb != null)
+        {
+            rb.velocity = Vector2.zero;
         }
 
         if (burrowRoutine != null)
@@ -370,6 +440,11 @@ public class InsectAI : EnemyAI
         if (bodyCollider != null)
         {
             bodyCollider.isTrigger = false;
+        }
+        phasedObstacle = null;
+        if (rb != null)
+        {
+            rb.velocity = Vector2.zero;
         }
 
         if (burrowRoutine != null)
@@ -446,8 +521,72 @@ public class InsectAI : EnemyAI
         }
     }
 
+    private bool TryFindPreferredEmergencePoint(out Vector2 newPosition)
+    {
+        Collider2D obstacle = phasedObstacle != null ? phasedObstacle : FindCurrentObstacle();
+        if (obstacle == null)
+        {
+            newPosition = transform.position;
+            return false;
+        }
+
+        Vector2 playerPosition = playerTransform != null ? playerTransform.position : transform.position;
+        Vector2 surfacePoint = obstacle.ClosestPoint(playerPosition);
+        Vector2 outward = playerPosition - surfacePoint;
+
+        if (outward.sqrMagnitude <= 0.0001f)
+        {
+            outward = playerPosition - (Vector2)obstacle.bounds.center;
+        }
+        if (outward.sqrMagnitude <= 0.0001f)
+        {
+            outward = (Vector2)transform.position - (Vector2)obstacle.bounds.center;
+        }
+        if (outward.sqrMagnitude <= 0.0001f)
+        {
+            outward = Vector2.right;
+        }
+
+        outward.Normalize();
+        Vector2 lateral = Vector2.Perpendicular(outward).normalized;
+
+        for (int i = 0; i < emergeAttempts; i++)
+        {
+            float sideOffset;
+            if (i == 0)
+            {
+                sideOffset = 0f;
+            }
+            else
+            {
+                int pairIndex = (i + 1) / 2;
+                float normalizedStep = emergeAttempts <= 1 ? 0f : pairIndex / (float)Mathf.Max(1, emergeAttempts / 2);
+                sideOffset = normalizedStep * emergeLateralRange;
+                if (i % 2 == 0)
+                {
+                    sideOffset = -sideOffset;
+                }
+            }
+
+            Vector2 candidate = surfacePoint + outward * emergeSurfaceOffset + lateral * sideOffset;
+            if (IsValidEmergencePoint(candidate))
+            {
+                newPosition = candidate;
+                return true;
+            }
+        }
+
+        newPosition = transform.position;
+        return false;
+    }
+
     private bool TryFindEmergencePoint(out Vector2 newPosition)
     {
+        if (TryFindPreferredEmergencePoint(out newPosition))
+        {
+            return true;
+        }
+
         Collider2D[] nearbyObstacles = Physics2D.OverlapCircleAll(transform.position, emergeSearchRadius, obstacleMask);
 
         for (int i = 0; i < emergeAttempts; i++)
@@ -535,6 +674,17 @@ public class InsectAI : EnemyAI
         Bounds bounds = bodyCollider.bounds;
         Collider2D hit = Physics2D.OverlapBox(bounds.center, bounds.size * 0.9f, 0f, obstacleMask);
         return hit != null;
+    }
+
+    private Collider2D FindCurrentObstacle()
+    {
+        if (bodyCollider == null)
+        {
+            return null;
+        }
+
+        Bounds bounds = bodyCollider.bounds;
+        return Physics2D.OverlapBox(bounds.center, bounds.size * 0.9f, 0f, obstacleMask);
     }
 
     private bool IsObstacleLayer(int layer)

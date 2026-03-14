@@ -42,6 +42,7 @@ public class Bullet : MonoBehaviour
             this.gameObject.layer = LayerMask.NameToLayer("MyBullet");
 
         groundLayerMask = 1 << LayerMask.NameToLayer("Ground");
+        groundLayerMask |= 1 << LayerMask.NameToLayer("Obstacle");
     }
 
     void Update()

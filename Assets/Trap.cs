@@ -38,13 +38,13 @@ public class Trap : MonoBehaviour
             {
                 t = UpTime;
                 anim.Play("trap", 0, 0f);
-                anim.speed = 1.0f;
+                anim.SetFloat("Speed", 1f);
             }
 
             else
             {
                 anim.Play("trap", 0, 1f);
-                anim.speed = -1.0f;
+                anim.SetFloat("Speed", -1f);
                 t = DownTime;
             }
         }

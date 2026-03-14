@@ -125,10 +125,10 @@ public class GameController : MonoBehaviour
         float clampedY = minY > maxY ? ActiveRoom.roomBounds.center.y : Mathf.Clamp(targetPosition.y, minY, maxY);
         mainCam.transform.position = new Vector3(clampedX, clampedY, mainCam.transform.position.z);
     }
-    public void FireBullet(GameObject prefab, Vector3 startPos, Vector2 dir, bool isEnemy)
+    public Bullet FireBullet(GameObject prefab, Vector3 startPos, Vector2 dir, bool isEnemy)
     {
         dir = dir.normalized;
-        if (prefab == null) return;
+        if (prefab == null) return null;
 
         string key = prefab.name;
         Bullet bullet = null;
@@ -150,6 +150,7 @@ public class GameController : MonoBehaviour
         bullet.gameObject.SetActive(true);
         bullet.Init(isEnemy, dir);
         activeBullets.Add(bullet);
+        return bullet;
     }
 
     public void ReturnBullet(Bullet bullet)
