@@ -20,6 +20,7 @@ public class MCController : MonoBehaviour
 
     private bool isCharging;
     private float currentChargeTime;
+    GameObject handup, handdown;
 
     public bool IsInSpace;
 
@@ -37,6 +38,7 @@ public class MCController : MonoBehaviour
     private Vector2 origColliderSize;
     private Vector2 origColliderOffset;
     private SpriteRenderer spriteRenderer;
+    private Animator spriteAnimator;
 
     [Header("Climbing System")]
     [SerializeField] private float climbSpeed = 4f;
@@ -96,9 +98,27 @@ public class MCController : MonoBehaviour
     {
         rb = GetComponent<Rigidbody2D>();
         rb.freezeRotation = true;
+        handup = transform.Find("handup").gameObject;
+        handdown = transform.Find("hand").gameObject;
+        handup.SetActive(false);
         rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
 
-        spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+        Transform spriteTransform = transform.Find("Sprite");
+        if (spriteTransform != null)
+        {
+            spriteRenderer = spriteTransform.GetComponent<SpriteRenderer>();
+            spriteAnimator = spriteTransform.GetComponent<Animator>();
+        }
+
+        if (spriteRenderer == null)
+        {
+            spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+        }
+
+        if (spriteAnimator == null)
+        {
+            spriteAnimator = GetComponentInChildren<Animator>();
+        }
 
         playerCollider = GetComponent<Collider2D>();
         if (playerCollider != null)
@@ -134,6 +154,8 @@ public class MCController : MonoBehaviour
         {
             SwapBullet(BulletPrefab);
         }
+
+        UpdateAnimationParameters();
     }
 
     public void SwapBullet(GameObject NewBulletPrefab)
@@ -320,7 +342,21 @@ public class MCController : MonoBehaviour
     void Update()
     {
         UIController.instance.SetEnergy(this.CurrentEnergy, this.MaxEnergy);
-        if (isStunned) return;
+        if(Input.GetMouseButton(0) && !isSliding && !isStunned)
+        {
+            handup.SetActive(true);
+            handdown.SetActive(false);
+        }
+        else
+        {
+            handup.SetActive(false);
+            handdown.SetActive(true);
+        }
+        if (isStunned)
+        {
+            UpdateAnimationParameters();
+            return;
+        }
 
         if (freezeCounter > 0f) freezeCounter -= Time.deltaTime;
         if (slideCooldownCounter > 0f) slideCooldownCounter -= Time.deltaTime;
@@ -434,6 +470,8 @@ public class MCController : MonoBehaviour
 
         if (!isClimbing && jumpBufferCounter > 0f && coyoteTimeCounter > 0f)
             PerformJump();
+
+        UpdateAnimationParameters();
     }
 
     void FixedUpdate()
@@ -444,6 +482,7 @@ public class MCController : MonoBehaviour
         if (isStunned)
         {
             ModifyPhysics();
+            UpdateAnimationParameters();
             return;
         }
 
@@ -457,11 +496,13 @@ public class MCController : MonoBehaviour
             {
                 StopClimbing();
             }
+            UpdateAnimationParameters();
             return;
         }
 
         Move();
         ModifyPhysics();
+        UpdateAnimationParameters();
     }
 
     private IEnumerator DropDownRoutine(Collider2D platformCollider)
@@ -764,6 +805,8 @@ public class MCController : MonoBehaviour
             transform.position = GameController.instance.LastCamp.transform.position;
             UIController.instance.SetHP(CurrentHealth, MaxHealth);
         }
+
+        UpdateAnimationParameters();
     }
 
     public void Hurt(float dmg)
@@ -797,5 +840,21 @@ public class MCController : MonoBehaviour
             Vector2 checkSize = new Vector2(origColliderSize.x * 0.8f, origColliderSize.y * 0.45f);
             Gizmos.DrawWireCube(checkPos, checkSize);
         }
+    }
+
+    private void UpdateAnimationParameters()
+    {
+        if (spriteAnimator == null)
+        {
+            return;
+        }
+
+        bool isWalking = isGrounded && !isSliding && !isClimbing && !isStunned && freezeCounter <= 0f && Mathf.Abs(horizontalInput) > 0.01f;
+        float verticalSpeed = (isGrounded || isClimbing || rb == null) ? 0f : rb.velocity.y;
+
+        spriteAnimator.SetBool("IsWalking", isWalking);
+        spriteAnimator.SetFloat("Vspeed", verticalSpeed);
+        spriteAnimator.SetBool("IsSliding", isSliding);
+        spriteAnimator.SetBool("isonground", isGrounded);
     }
 }
