@@ -27,6 +27,7 @@ public class EnemyController : MonoBehaviour
 
     // --- 新增：破损粒子效果所需变量 ---
     private ParticleSystem damageParticles;
+    public event System.Action<float> Damaged;
 
     private void Awake()
     {
@@ -99,6 +100,7 @@ public class EnemyController : MonoBehaviour
     public void Hurt(float dmg)
     {
         CurrentHP -= dmg;
+        Damaged?.Invoke(dmg);
 
         // 1. 触发或重置闪白光效果
         if (spriteRenderer != null)

@@ -14,7 +14,10 @@ public class MCController : MonoBehaviour
     public float EnergyRegenRate = 15f;
     public GameObject[] WeaponList;
     public GameObject BulletPrefab;
-    private int currentWeaponIndex = 0;
+    private const int WeaponSlotCount = 4;
+    private readonly GameObject[] weaponSlots = new GameObject[WeaponSlotCount];
+    private readonly bool[] unlockedWeapons = new bool[WeaponSlotCount];
+    private int currentWeaponIndex = -1;
     private float FireCoolDown;
     private float firecd;
 
@@ -146,14 +149,7 @@ public class MCController : MonoBehaviour
         CurrentEnergy = MaxEnergy;
         UIController.instance.SetHP(CurrentHealth, MaxHealth);
 
-        if (WeaponList != null && WeaponList.Length > 0)
-        {
-            SwapBullet(WeaponList[0]);
-        }
-        else if (BulletPrefab != null)
-        {
-            SwapBullet(BulletPrefab);
-        }
+        InitializeWeaponSlots();
 
         UpdateAnimationParameters();
     }
@@ -164,22 +160,36 @@ public class MCController : MonoBehaviour
         if (BulletPrefab != null)
         {
             FireCoolDown = BulletPrefab.GetComponent<Bullet>().CoolDown;
+            int slotIndex = GetWeaponSlotIndex(BulletPrefab);
+            if (slotIndex >= 0)
+            {
+                currentWeaponIndex = slotIndex;
+            }
         }
+        else
+        {
+            FireCoolDown = 0f;
+            currentWeaponIndex = -1;
+        }
+
+        RefreshWeaponUI();
     }
 
     private void HandleWeaponSwitch()
     {
-        if (WeaponList == null || WeaponList.Length <= 1) return;
+        HandleNumberWeaponSwitch();
 
         float scroll = Input.GetAxis("Mouse ScrollWheel");
         if (scroll != 0f)
         {
             if (scroll > 0f)
-                currentWeaponIndex = (currentWeaponIndex + 1) % WeaponList.Length;
+            {
+                CycleWeapon(1);
+            }
             else
-                currentWeaponIndex = (currentWeaponIndex - 1 + WeaponList.Length) % WeaponList.Length;
-
-            SwapBullet(WeaponList[currentWeaponIndex]);
+            {
+                CycleWeapon(-1);
+            }
         }
     }
 
@@ -342,7 +352,12 @@ public class MCController : MonoBehaviour
     void Update()
     {
         UIController.instance.SetEnergy(this.CurrentEnergy, this.MaxEnergy);
-        if(Input.GetMouseButton(0) && !isSliding && !isStunned)
+        if (isSliding)
+        {
+            handup.SetActive(false);
+            handdown.SetActive(false);
+        }
+        else if(Input.GetMouseButton(0) && !isStunned)
         {
             handup.SetActive(true);
             handdown.SetActive(false);
@@ -809,6 +824,11 @@ public class MCController : MonoBehaviour
         UpdateAnimationParameters();
     }
 
+    public void AcquireWeapon(GameObject bulletPrefab)
+    {
+        UnlockAndEquipWeapon(bulletPrefab);
+    }
+
     public void Hurt(float dmg)
     {
         if (isSliding) return;
@@ -856,5 +876,187 @@ public class MCController : MonoBehaviour
         spriteAnimator.SetFloat("Vspeed", verticalSpeed);
         spriteAnimator.SetBool("IsSliding", isSliding);
         spriteAnimator.SetBool("isonground", isGrounded);
+    }
+
+    private void InitializeWeaponSlots()
+    {
+        RegisterConfiguredWeapon(BulletPrefab, true);
+
+        if (WeaponList != null)
+        {
+            for (int i = 0; i < WeaponList.Length; i++)
+            {
+                RegisterConfiguredWeapon(WeaponList[i], true);
+            }
+        }
+
+        int firstUnlocked = GetFirstUnlockedWeaponIndex();
+        if (firstUnlocked >= 0 && weaponSlots[firstUnlocked] != null)
+        {
+            SwapBullet(weaponSlots[firstUnlocked]);
+        }
+        else
+        {
+            SwapBullet(null);
+        }
+    }
+
+    private void RegisterConfiguredWeapon(GameObject bulletPrefab, bool unlock)
+    {
+        int slotIndex = GetWeaponSlotIndex(bulletPrefab);
+        if (slotIndex < 0)
+        {
+            return;
+        }
+
+        weaponSlots[slotIndex] = bulletPrefab;
+        if (unlock)
+        {
+            unlockedWeapons[slotIndex] = true;
+        }
+    }
+
+    private void UnlockAndEquipWeapon(GameObject bulletPrefab)
+    {
+        int slotIndex = GetWeaponSlotIndex(bulletPrefab);
+        if (slotIndex < 0)
+        {
+            return;
+        }
+
+        weaponSlots[slotIndex] = bulletPrefab;
+        unlockedWeapons[slotIndex] = true;
+        RefreshWeaponUI();
+        EquipWeaponSlot(slotIndex, true);
+    }
+
+    private void HandleNumberWeaponSwitch()
+    {
+        if (Input.GetKeyDown(KeyCode.Alpha1))
+        {
+            TryEquipWeapon(0);
+        }
+        else if (Input.GetKeyDown(KeyCode.Alpha2))
+        {
+            TryEquipWeapon(1);
+        }
+        else if (Input.GetKeyDown(KeyCode.Alpha3))
+        {
+            TryEquipWeapon(2);
+        }
+        else if (Input.GetKeyDown(KeyCode.Alpha4))
+        {
+            TryEquipWeapon(3);
+        }
+    }
+
+    private void TryEquipWeapon(int slotIndex)
+    {
+        EquipWeaponSlot(slotIndex, false);
+    }
+
+    private void EquipWeaponSlot(int slotIndex, bool forceRefresh)
+    {
+        if (slotIndex < 0 || slotIndex >= WeaponSlotCount)
+        {
+            return;
+        }
+
+        if (!unlockedWeapons[slotIndex] || weaponSlots[slotIndex] == null)
+        {
+            return;
+        }
+
+        if (!forceRefresh && currentWeaponIndex == slotIndex)
+        {
+            return;
+        }
+
+        SwapBullet(weaponSlots[slotIndex]);
+    }
+
+    private void CycleWeapon(int step)
+    {
+        if (GetUnlockedWeaponCount() <= 1)
+        {
+            return;
+        }
+
+        int index = currentWeaponIndex >= 0 ? currentWeaponIndex : 0;
+        for (int i = 0; i < WeaponSlotCount; i++)
+        {
+            index = (index + step + WeaponSlotCount) % WeaponSlotCount;
+            if (unlockedWeapons[index] && weaponSlots[index] != null)
+            {
+                SwapBullet(weaponSlots[index]);
+                return;
+            }
+        }
+    }
+
+    private int GetFirstUnlockedWeaponIndex()
+    {
+        for (int i = 0; i < WeaponSlotCount; i++)
+        {
+            if (unlockedWeapons[i] && weaponSlots[i] != null)
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private int GetUnlockedWeaponCount()
+    {
+        int count = 0;
+        for (int i = 0; i < WeaponSlotCount; i++)
+        {
+            if (unlockedWeapons[i] && weaponSlots[i] != null)
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private int GetWeaponSlotIndex(GameObject bulletPrefab)
+    {
+        if (bulletPrefab == null)
+        {
+            return -1;
+        }
+
+        if (bulletPrefab.GetComponent<FlameBullet>() != null)
+        {
+            return 1;
+        }
+
+        if (bulletPrefab.GetComponent<ChargeBullet>() != null)
+        {
+            return 2;
+        }
+
+        if (bulletPrefab.GetComponent<IceBullet>() != null)
+        {
+            return 3;
+        }
+
+        Bullet bullet = bulletPrefab.GetComponent<Bullet>();
+        if (bullet != null)
+        {
+            return 0;
+        }
+
+        return -1;
+    }
+
+    private void RefreshWeaponUI()
+    {
+        if (UIController.instance != null)
+        {
+            UIController.instance.UpdateWeaponIcons(unlockedWeapons, currentWeaponIndex);
+        }
     }
 }

@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
+using UnityEngine.UI;
 public class UIController : MonoBehaviour
 {
     public static UIController instance;
@@ -16,6 +17,11 @@ public class UIController : MonoBehaviour
 
     public GameObject MinimapBG;
 
+    public GameObject Bullet1Icon, Bullet2Icon, Bullet3Icon, Bullet4Icon;
+    private GameObject[] bulletIconRoots;
+    private Image[] bulletImages;
+    private TMP_Text[] bulletTexts;
+
     // Start is called before the first frame update
     private void Awake()
     {
@@ -29,6 +35,22 @@ public class UIController : MonoBehaviour
 
         BOSSHP = BossHPParent.transform.Find("hp").gameObject;
         BossHPParent.SetActive(false);
+
+        bulletIconRoots = new GameObject[4];
+        bulletImages = new Image[4];
+        bulletTexts = new TMP_Text[4];
+
+        bulletIconRoots[0] = Bullet1Icon;
+        bulletIconRoots[1] = Bullet2Icon;
+        bulletIconRoots[2] = Bullet3Icon;
+        bulletIconRoots[3] = Bullet4Icon;
+
+        for (int i = 0; i < bulletIconRoots.Length; i++)
+        {
+            CacheBulletIconParts(i);
+        }
+
+        UpdateWeaponIcons(new bool[4], -1);
     }
 
 
@@ -95,6 +117,85 @@ public class UIController : MonoBehaviour
     {
         MinimapBG.SetActive(false);
         Minimap.instance.gridParent.gameObject.SetActive(false);
+    }
+
+    public void UpdateWeaponIcons(bool[] unlockedWeapons, int equippedIndex)
+    {
+        if (bulletIconRoots == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < bulletIconRoots.Length; i++)
+        {
+            GameObject root = bulletIconRoots[i];
+            if (root == null)
+            {
+                continue;
+            }
+
+            bool unlocked = unlockedWeapons != null && i < unlockedWeapons.Length && unlockedWeapons[i];
+            root.SetActive(unlocked);
+
+            if (!unlocked)
+            {
+                continue;
+            }
+
+            float alpha = i == equippedIndex ? 1f : 0.5f;
+            SetGraphicAlpha(bulletImages[i], alpha);
+            SetTextAlpha(bulletTexts[i], alpha);
+        }
+    }
+
+    private void CacheBulletIconParts(int index)
+    {
+        GameObject root = bulletIconRoots[index];
+        if (root == null)
+        {
+            return;
+        }
+
+        Transform imageTransform = root.transform.Find("Image");
+        if (imageTransform != null)
+        {
+            bulletImages[index] = imageTransform.GetComponent<Image>();
+        }
+
+        Transform textTransform = root.transform.Find("Text(TMP)");
+        if (textTransform == null)
+        {
+            textTransform = root.transform.Find("Text (TMP)");
+        }
+
+        if (textTransform != null)
+        {
+            bulletTexts[index] = textTransform.GetComponent<TMP_Text>();
+        }
+    }
+
+    private void SetGraphicAlpha(Image image, float alpha)
+    {
+        if (image == null)
+        {
+            return;
+        }
+
+        Color color = image.color;
+        color.a = alpha;
+        image.color = color;
+    }
+
+    private void SetTextAlpha(TMP_Text text, float alpha)
+    {
+        if (text == null)
+        {
+            return;
+        }
+
+        Color color = text.color;
+        color.a = alpha;
+        text.color = color;
     }
 
 }

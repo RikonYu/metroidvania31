@@ -181,7 +181,19 @@ public class GameController : MonoBehaviour
 
     public void PickupBulllet(GameObject blt)
     {
-        AcquiredBullets.Add(blt);
-        mc.SwapBullet(blt);
+        if (blt == null)
+        {
+            return;
+        }
+
+        if (!AcquiredBullets.Contains(blt))
+        {
+            AcquiredBullets.Add(blt);
+        }
+
+        if (mc != null)
+        {
+            mc.AcquireWeapon(blt);
+        }
     }
 }

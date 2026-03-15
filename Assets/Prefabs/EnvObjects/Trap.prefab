@@ -103,7 +103,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   UpTime: 1
   DownTime: 1
-  damage: 10
+  damage: 5
   stunDuration: 0.5
   knockbackForce: 15
 --- !u!61 &6481068641967511882

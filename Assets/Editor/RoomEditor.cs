@@ -51,7 +51,6 @@ public class RoomEditor : Editor
 
                     tm.CompressBounds();
 
-                    Debug.Log($"{tm.name}, {tm.cellBounds.size}");
                     if (tm.cellBounds.size.x == 0 || tm.cellBounds.size.y == 0) continue;
 
                     Vector3 bl = tm.CellToWorld(tm.cellBounds.min);
