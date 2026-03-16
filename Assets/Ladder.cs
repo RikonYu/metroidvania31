@@ -24,7 +24,6 @@ public class Ladder : MonoBehaviour
 
     private void OnTriggerExit2D(Collider2D collision)
     {
-        Debug.Log("exit");
         MCController mc = collision.GetComponent<MCController>();
         if (mc != null)
         {

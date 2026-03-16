@@ -1,7 +1,7 @@
 using System.Collections;
 using UnityEngine;
 
-public class ArmAI : EnemyAI
+public class ArmAI : EnemyAI, IEncounterResettable
 {
     [Header("References")]
     public Transform leftArm;
@@ -108,6 +108,52 @@ public class ArmAI : EnemyAI
         {
             StopCoroutine(attackLoop);
             attackLoop = null;
+        }
+    }
+
+    public void ResetEncounterState()
+    {
+        ResolveReferences();
+        if (leftRig == null && leftArm != null)
+        {
+            leftRig = BuildRig(leftArm, leftFireSpot);
+        }
+        if (rightRig == null && rightArm != null)
+        {
+            rightRig = BuildRig(rightArm, rightFireSpot);
+        }
+
+        if (attackLoop != null)
+        {
+            StopCoroutine(attackLoop);
+            attackLoop = null;
+        }
+
+        lastAttackIndex = -1;
+        moveInput = Vector2.zero;
+        transform.localPosition = fixedBodyLocalPosition;
+
+        if (rb != null)
+        {
+            rb.velocity = Vector2.zero;
+            rb.gravityScale = 0f;
+        }
+
+        if (leftRig != null)
+        {
+            SetArmLocalPosition(leftRig, leftRig.centerPos);
+            SetArmVisible(leftRig, false);
+        }
+
+        if (rightRig != null)
+        {
+            SetArmLocalPosition(rightRig, rightRig.centerPos);
+            SetArmVisible(rightRig, false);
+        }
+
+        if (isActiveAndEnabled)
+        {
+            attackLoop = StartCoroutine(AttackLoop());
         }
     }
 

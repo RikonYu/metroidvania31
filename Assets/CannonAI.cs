@@ -12,6 +12,7 @@ public class CannonAI : EnemyAI
     private LaserBullet activeLaser;
     private float cycleTimer;
     private bool waitingForDowntime;
+    private float forcedFireTimer;
 
     protected override void Start()
     {
@@ -49,6 +50,35 @@ public class CannonAI : EnemyAI
         if (activeLaser != null && !activeLaser.gameObject.activeInHierarchy)
         {
             activeLaser = null;
+        }
+
+        if (forcedFireTimer > 0f)
+        {
+            forcedFireTimer -= Time.deltaTime;
+
+            if (activeLaser == null)
+            {
+                FireLaser();
+            }
+
+            if (activeLaser != null)
+            {
+                activeLaser.SetDuration(0f);
+            }
+
+            if (forcedFireTimer <= 0f)
+            {
+                forcedFireTimer = 0f;
+
+                if (downtime > 0f)
+                {
+                    StopLaser(false);
+                    waitingForDowntime = true;
+                    cycleTimer = Mathf.Max(0.01f, downtime);
+                }
+            }
+
+            return;
         }
 
         if (downtime <= 0f)
@@ -171,6 +201,29 @@ public class CannonAI : EnemyAI
         }
     }
 
+    public void ForceFireFor(float duration)
+    {
+        if (duration <= 0f || !isActiveAndEnabled)
+        {
+            return;
+        }
+
+        forcedFireTimer = Mathf.Max(forcedFireTimer, duration);
+        waitingForDowntime = false;
+        cycleTimer = 0f;
+
+        if (activeLaser == null)
+        {
+            FireLaser();
+        }
+
+        if (activeLaser != null)
+        {
+            activeLaser.SetDuration(0f);
+            activeLaser.SetOwner(controller);
+        }
+    }
+
     private void StopLaser(bool resetCycle)
     {
         if (activeLaser != null)
@@ -183,6 +236,7 @@ public class CannonAI : EnemyAI
         {
             waitingForDowntime = false;
             cycleTimer = 0f;
+            forcedFireTimer = 0f;
         }
     }
 

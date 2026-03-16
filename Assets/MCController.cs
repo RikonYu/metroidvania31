@@ -98,6 +98,10 @@ public class MCController : MonoBehaviour
     private Transform fireSpot;
     private bool controlsLocked;
     private float lockedGravityScale;
+    public bool IsControlLocked => controlsLocked;
+    private bool wasFallingLastStep;
+    private float inheritedFallDirection;
+    private bool fallDirectionChanged;
 
     float freezeCounter;
     float slidetime;
@@ -660,7 +664,39 @@ public class MCController : MonoBehaviour
 
     private void Move()
     {
-        float targetVelX = isSliding ? currentSlideDir * slideSpeed : horizontalInput * moveSpeed;
+        bool isFalling = !isGrounded && rb.velocity.y < -0.01f;
+
+        if (isFalling && !wasFallingLastStep)
+        {
+            inheritedFallDirection = Mathf.Abs(rb.velocity.x) > 0.01f ? Mathf.Sign(rb.velocity.x) : 0f;
+            fallDirectionChanged = false;
+        }
+
+        if (!isFalling)
+        {
+            inheritedFallDirection = 0f;
+            fallDirectionChanged = false;
+        }
+
+        float fallControlMultiplier = 1f;
+        if (isFalling)
+        {
+            float inputDirection = Mathf.Abs(horizontalInput) > 0.01f ? Mathf.Sign(horizontalInput) : 0f;
+            bool hasInheritedMomentum = Mathf.Abs(inheritedFallDirection) > 0.01f;
+
+            if (fallDirectionChanged || !hasInheritedMomentum)
+            {
+                fallControlMultiplier = 0.5f;
+            }
+            else if (inputDirection != 0f && inputDirection != inheritedFallDirection)
+            {
+                fallDirectionChanged = true;
+                fallControlMultiplier = 0.5f;
+            }
+        }
+
+        float horizontalControlSpeed = horizontalInput * moveSpeed * fallControlMultiplier;
+        float targetVelX = isSliding ? currentSlideDir * slideSpeed : horizontalControlSpeed;
         float newVelX = targetVelX;
         float newVelY = rb.velocity.y;
 
@@ -723,6 +759,7 @@ public class MCController : MonoBehaviour
         }
 
         rb.velocity = new Vector2(newVelX, newVelY);
+        wasFallingLastStep = isFalling;
     }
 
     private void PerformJump()

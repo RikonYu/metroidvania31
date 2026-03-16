@@ -11,8 +11,8 @@ GameObject:
   - component: {fileID: 163069815059962614}
   - component: {fileID: 163069815059962608}
   - component: {fileID: 163069815059962609}
-  - component: {fileID: 1902633332449829949}
   - component: {fileID: 2036458124153311715}
+  - component: {fileID: 5000889386129294160}
   m_Layer: 8
   m_Name: Eye
   m_TagString: Enemy
@@ -71,19 +71,36 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: db099128c97251c4c84fc42e287a5ce5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  MaxHP: 0
+  MaxHP: 150
   CurrentHP: 0
   MoveSpeed: 0
   CollideDamage: 0
   stunDuration: 0.25
   knockbackForce: 10
-  IsFlying: 0
+  IsFlying: 1
   Waypoints: {fileID: 1558084376845915473}
   wm: {fileID: 0}
   IsBoss: 1
+  CombatEnabled: 1
   flashDuration: 0.15
   flashColor: {r: 1, g: 1, b: 1, a: 1}
---- !u!114 &1902633332449829949
+--- !u!58 &2036458124153311715
+CircleCollider2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 163069815059962610}
+  m_Enabled: 1
+  m_Density: 1
+  m_Material: {fileID: 0}
+  m_IsTrigger: 0
+  m_UsedByEffector: 0
+  m_UsedByComposite: 0
+  m_Offset: {x: 0, y: 0}
+  serializedVersion: 2
+  m_Radius: 5.5
+--- !u!114 &5000889386129294160
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -92,7 +109,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 163069815059962610}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7a7de49f49cf21840b3d53ef63de4095, type: 3}
+  m_Script: {fileID: 11500000, guid: 7c7eaa2e0284cab4facea00af43bea8e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   Bullet: {fileID: 0}
@@ -113,22 +130,11 @@ MonoBehaviour:
   attackCooldown: 2
   waypointTolerance: 0.5
   searchWaitTime: 2
---- !u!58 &2036458124153311715
-CircleCollider2D:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 163069815059962610}
-  m_Enabled: 1
-  m_Density: 1
-  m_Material: {fileID: 0}
-  m_IsTrigger: 0
-  m_UsedByEffector: 0
-  m_UsedByComposite: 0
-  m_Offset: {x: 0, y: 0}
-  serializedVersion: 2
-  m_Radius: 5.5
+  pulseInterval: 4
+  pulseDuration: 2
+  hurtTrackSpeedMultiplier: 2
+  hurtShakeAmplitude: 0.35
+  openDoorsOnDeath: 1
 --- !u!1 &163069816326980511
 GameObject:
   m_ObjectHideFlags: 0

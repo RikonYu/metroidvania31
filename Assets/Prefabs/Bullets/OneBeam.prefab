@@ -126,9 +126,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   IsEnemy: 1
-  DamagePerSecond: 0.1
+  DamagePerSecond: 0.05
   Direction: 2
-  MaxLength: 20
+  MaxLength: 999
   BlockingMask:
     serializedVersion: 2
     m_Bits: 192

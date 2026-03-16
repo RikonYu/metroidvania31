@@ -408,7 +408,7 @@ public class InsectAI : EnemyAI
             return;
         }
 
-        if (TryFindPreferredEmergencePoint(out Vector2 preferredPosition))
+        if (TryFindEmergencePoint(out Vector2 preferredPosition))
         {
             transform.position = preferredPosition;
         }
@@ -523,16 +523,12 @@ public class InsectAI : EnemyAI
 
     private bool TryFindEmergencePoint(out Vector2 newPosition)
     {
-        if (TryFindPreferredEmergencePoint(out newPosition))
-        {
-            return true;
-        }
-
-        Collider2D[] nearbyObstacles = Physics2D.OverlapCircleAll(transform.position, emergeSearchRadius, obstacleMask);
+        Vector2 searchCenter = transform.position;
+        Collider2D[] nearbyObstacles = Physics2D.OverlapCircleAll(searchCenter, emergeSearchRadius, GetObstacleCheckMask());
 
         for (int i = 0; i < emergeAttempts; i++)
         {
-            Vector2 candidate = GetRandomEmergenceCandidate(nearbyObstacles);
+            Vector2 candidate = GetRandomEmergenceCandidate(nearbyObstacles, searchCenter);
             if (IsValidEmergencePoint(candidate))
             {
                 newPosition = candidate;
@@ -540,28 +536,50 @@ public class InsectAI : EnemyAI
             }
         }
 
+        if (TryFindPreferredEmergencePoint(out newPosition))
+        {
+            return true;
+        }
+
         newPosition = transform.position;
         return false;
     }
 
-    private Vector2 GetRandomEmergenceCandidate(Collider2D[] nearbyObstacles)
+    private Vector2 GetRandomEmergenceCandidate(Collider2D[] nearbyObstacles, Vector2 searchCenter)
     {
         if (nearbyObstacles != null && nearbyObstacles.Length > 0)
         {
             Collider2D obstacle = nearbyObstacles[Random.Range(0, nearbyObstacles.Length)];
-            Vector2 reference = playerTransform != null ? playerTransform.position : transform.position;
-            Vector2 closestPoint = obstacle.ClosestPoint(reference);
-            Vector2 away = closestPoint - reference;
-            if (away.sqrMagnitude <= 0.0001f)
+            Vector2 obstacleCenter = obstacle.bounds.center;
+            Vector2 randomDir = Random.insideUnitCircle;
+            if (randomDir.sqrMagnitude <= 0.0001f)
             {
-                away = Random.insideUnitCircle.normalized;
+                randomDir = Vector2.right;
             }
+            randomDir.Normalize();
 
-            Vector2 lateral = Vector2.Perpendicular(away.normalized) * Random.Range(-emergeLateralRange, emergeLateralRange);
-            return closestPoint + away.normalized * emergeSurfaceOffset + lateral;
+            float approxRadius = Mathf.Max(obstacle.bounds.extents.x, obstacle.bounds.extents.y) + emergeSurfaceOffset + emergeLateralRange;
+            Vector2 probe = obstacleCenter + randomDir * Mathf.Max(0.1f, approxRadius);
+            Vector2 surfacePoint = obstacle.ClosestPoint(probe);
+
+            Vector2 outward = surfacePoint - obstacleCenter;
+            if (outward.sqrMagnitude <= 0.0001f)
+            {
+                outward = randomDir;
+            }
+            outward.Normalize();
+
+            Vector2 lateral = Vector2.Perpendicular(outward) * Random.Range(-emergeLateralRange, emergeLateralRange);
+            return surfacePoint + outward * emergeSurfaceOffset + lateral;
         }
 
-        return (Vector2)transform.position + Random.insideUnitCircle.normalized * Random.Range(0.75f, emergeSearchRadius);
+        Vector2 fallbackDir = Random.insideUnitCircle;
+        if (fallbackDir.sqrMagnitude <= 0.0001f)
+        {
+            fallbackDir = Vector2.right;
+        }
+        fallbackDir.Normalize();
+        return searchCenter + fallbackDir * Random.Range(0.75f, emergeSearchRadius);
     }
 
     private bool IsValidEmergencePoint(Vector2 point)
@@ -588,7 +606,7 @@ public class InsectAI : EnemyAI
     private bool WouldOverlapObstacle(Vector2 point)
     {
         Bounds movedBounds = GetBoundsAtPoint(point);
-        Collider2D hit = Physics2D.OverlapBox(movedBounds.center, movedBounds.size * 0.9f, 0f, obstacleMask);
+        Collider2D hit = Physics2D.OverlapBox(movedBounds.center, movedBounds.size * 0.9f, 0f, GetObstacleCheckMask());
         return hit != null;
     }
 
@@ -613,7 +631,7 @@ public class InsectAI : EnemyAI
         }
 
         Bounds bounds = bodyCollider.bounds;
-        Collider2D hit = Physics2D.OverlapBox(bounds.center, bounds.size * 0.9f, 0f, obstacleMask);
+        Collider2D hit = Physics2D.OverlapBox(bounds.center, bounds.size * 0.9f, 0f, GetObstacleCheckMask());
         return hit != null;
     }
 
@@ -625,12 +643,24 @@ public class InsectAI : EnemyAI
         }
 
         Bounds bounds = bodyCollider.bounds;
-        return Physics2D.OverlapBox(bounds.center, bounds.size * 0.9f, 0f, obstacleMask);
+        return Physics2D.OverlapBox(bounds.center, bounds.size * 0.9f, 0f, GetObstacleCheckMask());
     }
 
     private bool IsObstacleLayer(int layer)
     {
-        return (obstacleMask.value & (1 << layer)) != 0;
+        LayerMask mask = GetObstacleCheckMask();
+        return (mask.value & (1 << layer)) != 0;
+    }
+
+    private LayerMask GetObstacleCheckMask()
+    {
+        int fallbackMask = LayerMask.GetMask("ground", "obstacle", "Ground", "Obstacle");
+        if (obstacleMask.value == 0)
+        {
+            return fallbackMask;
+        }
+
+        return obstacleMask | fallbackMask;
     }
 
     private bool TryHitPlayer(GameObject target)

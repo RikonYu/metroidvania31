@@ -18,6 +18,8 @@ public class HeartAIEditor : Editor
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("State 1", EditorStyles.boldLabel);
         EditorGUILayout.PropertyField(serializedObject.FindProperty("state1LaunchInterval"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("launchEnemyFlyDuration"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("launchEnemyFallbackSpeed"));
 
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("State 2", EditorStyles.boldLabel);

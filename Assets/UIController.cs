@@ -22,6 +22,8 @@ public class UIController : MonoBehaviour
     private Image[] bulletImages;
     private TMP_Text[] bulletTexts;
 
+    public Image blackbg;
+
     // Start is called before the first frame update
     private void Awake()
     {

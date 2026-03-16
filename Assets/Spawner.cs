@@ -7,7 +7,7 @@ public class SpawnerWave
     public List<GameObject> enemies = new List<GameObject>();
 }
 
-public class Spawner : MonoBehaviour
+public class Spawner : MonoBehaviour, IEncounterResettable
 {
     [Header("Waves")]
     public List<SpawnerWave> waves = new List<SpawnerWave>();
@@ -253,5 +253,42 @@ public class Spawner : MonoBehaviour
         }
 
         return !doorCollider.enabled;
+    }
+
+    public bool ContainsEnemy(GameObject enemyObject)
+    {
+        if (enemyObject == null || waves == null)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < waves.Count; i++)
+        {
+            SpawnerWave wave = waves[i];
+            if (wave == null || wave.enemies == null)
+            {
+                continue;
+            }
+
+            for (int j = 0; j < wave.enemies.Count; j++)
+            {
+                if (wave.enemies[j] == enemyObject)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    public void ResetEncounterState()
+    {
+        UnlockRoomDoors();
+        completed = false;
+        initialized = false;
+        currentWaveIndex = -1;
+        SetAllWaveEnemiesActive(false);
+        SetRewardsActive(false);
     }
 }

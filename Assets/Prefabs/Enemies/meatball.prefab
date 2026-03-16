@@ -108,6 +108,7 @@ MonoBehaviour:
   Waypoints: {fileID: 1558084376845915473}
   wm: {fileID: 0}
   IsBoss: 0
+  CombatEnabled: 1
   flashDuration: 0.15
   flashColor: {r: 1, g: 1, b: 1, a: 1}
 --- !u!114 &4952073666060088364
@@ -122,6 +123,33 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 70625119c37d77c4c9ddf4fc6f5dde38, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  Bullet: {fileID: 0}
+  StageNum: 0
+  currentPhase: 0
+  Portion:
+  - 1
+  currentState: 0
+  viewAngle: 90
+  viewRadius: 10
+  chaseRadius: 15
+  obstacleMask:
+    serializedVersion: 2
+    m_Bits: 0
+  alertDuration: 0.8
+  prepareAttackDuration: 0.5
+  attackRange: 1.5
+  attackCooldown: 2
+  waypointTolerance: 0.5
+  searchWaitTime: 2
+  InsectPrefab: {fileID: 163069815059962610, guid: 67723c7cc803e1147a3a46ec3578f313, type: 3}
+  flySpeed: 8
+  stopMask:
+    serializedVersion: 2
+    m_Bits: 0
+  splitCount: 3
+  splitInitialSpeed: 6
+  splitInitialDuration: 0.5
+  splitAttackAngleSpread: 28
 --- !u!114 &6975389790004276861
 MonoBehaviour:
   m_ObjectHideFlags: 0

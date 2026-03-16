@@ -47,7 +47,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   IsEnemy: 0
   Speed: 0
-  Damage: 0.1
+  Damage: 0.05
   Duration: 2
   CoolDown: 0
   MaxBounceCount: 0
@@ -59,7 +59,7 @@ MonoBehaviour:
   BlockingMask:
     serializedVersion: 2
     m_Bits: 192
-  MaxLength: 20
+  MaxLength: 999
   beamTemplate: {fileID: 7242603002371341726, guid: 14ecebcfaa19c904f900fcb902e824e9, type: 3}
 --- !u!50 &5756801116924514008
 Rigidbody2D:

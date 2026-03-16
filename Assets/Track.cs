@@ -17,7 +17,6 @@ public class Track : MonoBehaviour
         {
             spriteRenderer.flipX = false;
         }
-        animator.SetBool("isleft", IsLeft) ;
 
         UpdateAnimatorSpeed();
 
@@ -34,6 +33,16 @@ public class Track : MonoBehaviour
         return new Vector2(direction * Mathf.Abs(MoveSpeed), 0f);
     }
 
+    public void SetDirection(bool isLeft)
+    {
+        IsLeft = isLeft;
+    }
+
+    public void SetMoveSpeed(float speed)
+    {
+        MoveSpeed = speed;
+    }
+
     private void UpdateAnimatorSpeed()
     {
         if (animator == null)
@@ -41,8 +50,7 @@ public class Track : MonoBehaviour
             return;
         }
 
-        float signedSpeed = IsLeft ? -Mathf.Abs(MoveSpeed) : Mathf.Abs(MoveSpeed);
-        animator.SetFloat("Speed", signedSpeed / 3f);
-
+        animator.SetFloat("Speed", MoveSpeed *(IsLeft?-1:1) / 3f);
     }
+
 }

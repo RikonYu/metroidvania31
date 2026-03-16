@@ -27,10 +27,13 @@ public class GameController : MonoBehaviour
 
     [SerializeField] private Transform bulletContainer;
     [SerializeField] private float bossIntroDuration = 1.1f;
+    [SerializeField] private float bossIntroCameraDuration = 2.2f;
 
     List<GameObject> AcquiredBullets;
     private Coroutine bossIntroCoroutine;
     private Room bossIntroRoom;
+    private bool bossIntroCameraOverrideActive;
+    private Vector3 bossIntroCameraOverridePosition;
     private Room bossLockedDoorRoom;
     private readonly List<Door> bossClosedDoors = new List<Door>();
 
@@ -67,10 +70,9 @@ public class GameController : MonoBehaviour
             if (boss != null)
             {
                 CloseBossRoomDoors(des);
-                UIController.instance.ShowBossHP(boss.name, boss.MaxHP);
-                UIController.instance.SetBossHPRevealScale(0f);
+                UIController.instance.HideBossHP();
                 SetBossCombatEnabled(des, false);
-                bossIntroCoroutine = StartCoroutine(BossIntroRoutine(des));
+                bossIntroCoroutine = StartCoroutine(BossIntroRoutine(des, boss));
                 return;
             }
 
@@ -107,12 +109,24 @@ public class GameController : MonoBehaviour
     }
     public void ResetGameState()
     {
+        HashSet<GameObject> spawnerManagedEnemies = GetAllSpawnerManagedEnemies();
+
         foreach (var i in AllEnemies)
-            if (!i.IsBoss)
+        {
+            if (i == null || i.IsBoss)
             {
-                i.gameObject.SetActive(true);
-                i.Respawn();
+                continue;
             }
+
+            if (spawnerManagedEnemies.Contains(i.gameObject))
+            {
+                continue;
+            }
+
+            i.gameObject.SetActive(true);
+            i.Respawn();
+        }
+
         mc.CurrentHealth = mc.MaxHealth;
     }
     public void ResetAggro()
@@ -128,6 +142,15 @@ public class GameController : MonoBehaviour
     {
         UIController.instance.ShowLose();
         ClearBullets();
+        CleanupUnownedEnemies();
+        Room deathRoom = ActiveRoom;
+        bool diedInBossRoom = !isDropped && deathRoom != null && deathRoom.IsBossRoom;
+
+        if (diedInBossRoom)
+        {
+            ResetRoomEncounterState(deathRoom, true, true);
+        }
+
         OpenBossLockedDoors();
         Door.OpenAllDoors();
         if (isDropped)
@@ -142,6 +165,29 @@ public class GameController : MonoBehaviour
         mc.Respawn(isDropped);
     }
 
+    private void CleanupUnownedEnemies()
+    {
+        for (int i = AllEnemies.Count - 1; i >= 0; i--)
+        {
+            EnemyController enemy = AllEnemies[i];
+            if (enemy == null)
+            {
+                AllEnemies.RemoveAt(i);
+                continue;
+            }
+
+            Room ownerRoom = enemy.GetComponentInParent<Room>();
+            if (ownerRoom != null)
+            {
+                continue;
+            }
+
+            enemy.gameObject.SetActive(false);
+            Destroy(enemy.gameObject);
+            AllEnemies.RemoveAt(i);
+        }
+    }
+
     public void ResolvePlayerDoorOverlap(Room room)
     {
         EnsurePlayerInsideClosedDoors(room);
@@ -150,19 +196,13 @@ public class GameController : MonoBehaviour
     {
         if (ActiveRoom == null || mc == null || mainCam == null) return;
 
-        Vector3 targetPosition = mc.transform.position;
+        if (bossIntroCameraOverrideActive)
+        {
+            mainCam.transform.position = bossIntroCameraOverridePosition;
+            return;
+        }
 
-        float camHalfHeight = mainCam.orthographicSize;
-        float camHalfWidth = camHalfHeight * mainCam.aspect;
-
-        float minX = ActiveRoom.roomBounds.min.x + camHalfWidth;
-        float maxX = ActiveRoom.roomBounds.max.x - camHalfWidth;
-        float minY = ActiveRoom.roomBounds.min.y + camHalfHeight;
-        float maxY = ActiveRoom.roomBounds.max.y - camHalfHeight;
-
-        float clampedX = minX > maxX ? ActiveRoom.roomBounds.center.x : Mathf.Clamp(targetPosition.x, minX, maxX);
-        float clampedY = minY > maxY ? ActiveRoom.roomBounds.center.y : Mathf.Clamp(targetPosition.y, minY, maxY);
-        mainCam.transform.position = new Vector3(clampedX, clampedY, mainCam.transform.position.z);
+        mainCam.transform.position = GetClampedCameraPosition(ActiveRoom, mc.transform.position);
     }
     public Bullet FireBullet(GameObject prefab, Vector3 startPos, Vector2 dir, bool isEnemy)
     {
@@ -236,7 +276,7 @@ public class GameController : MonoBehaviour
         }
     }
 
-    private IEnumerator BossIntroRoutine(Room room)
+    private IEnumerator BossIntroRoutine(Room room, EnemyController boss)
     {
         bossIntroRoom = room;
 
@@ -245,32 +285,24 @@ public class GameController : MonoBehaviour
             mc.SetControlLocked(true);
         }
 
-        if (Shaker.instance != null)
+        yield return StartCoroutine(RunBossIntroCameraPhase(room));
+
+        ClearBossIntroCameraOverride();
+        if (ActiveRoom == room && mc != null && mainCam != null)
         {
-            Shaker.instance.StartBossIntroShake();
+            mainCam.transform.position = GetClampedCameraPosition(room, mc.transform.position);
         }
 
-        float duration = Mathf.Max(0.01f, bossIntroDuration);
-        float elapsed = 0f;
-
-        while (elapsed < duration)
+        if (ActiveRoom == room)
         {
-            if (ActiveRoom != room)
+            EnemyController bossToShow = boss != null ? boss : GetFirstAliveBoss(room);
+            if (bossToShow != null)
             {
-                break;
+                UIController.instance?.ShowBossHP(bossToShow.name, bossToShow.MaxHP);
+                UIController.instance?.SetBossHPRevealScale(0f);
+                yield return StartCoroutine(RunBossIntroUIPhase(room));
+                UIController.instance?.SetBossHPRevealScale(1f);
             }
-
-            elapsed += Time.deltaTime;
-            float t = Mathf.Clamp01(elapsed / duration);
-            UIController.instance?.SetBossHPRevealScale(t);
-            yield return null;
-        }
-
-        UIController.instance?.SetBossHPRevealScale(1f);
-
-        if (Shaker.instance != null)
-        {
-            Shaker.instance.StopBossIntroShake();
         }
 
         if (ActiveRoom == room)
@@ -287,12 +319,81 @@ public class GameController : MonoBehaviour
         bossIntroRoom = null;
     }
 
+    private IEnumerator RunBossIntroCameraPhase(Room room)
+    {
+        float duration = Mathf.Max(0.01f, bossIntroCameraDuration);
+        float halfDuration = duration * 0.5f;
+        float elapsed = 0f;
+
+        if (Shaker.instance != null)
+        {
+            Shaker.instance.StartBossIntroShake();
+        }
+
+        while (elapsed < halfDuration)
+        {
+            if (ActiveRoom != room)
+            {
+                break;
+            }
+
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / Mathf.Max(0.01f, halfDuration));
+            SetBossIntroCameraLerp(room, t);
+            yield return null;
+        }
+
+        if (Shaker.instance != null)
+        {
+            Shaker.instance.StopBossIntroShake();
+        }
+
+        elapsed = 0f;
+        while (elapsed < halfDuration)
+        {
+            if (ActiveRoom != room)
+            {
+                break;
+            }
+
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / Mathf.Max(0.01f, halfDuration));
+            SetBossIntroCameraLerp(room, 1f - t);
+            yield return null;
+        }
+    }
+
+    private IEnumerator RunBossIntroUIPhase(Room room)
+    {
+        float duration = Mathf.Max(0.01f, bossIntroDuration);
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            if (ActiveRoom != room)
+            {
+                break;
+            }
+
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            UIController.instance?.SetBossHPRevealScale(t);
+            yield return null;
+        }
+    }
+
     private void StopBossIntroSequence()
     {
         if (bossIntroCoroutine != null)
         {
             StopCoroutine(bossIntroCoroutine);
             bossIntroCoroutine = null;
+        }
+
+        ClearBossIntroCameraOverride();
+        if (ActiveRoom != null && mc != null && mainCam != null)
+        {
+            mainCam.transform.position = GetClampedCameraPosition(ActiveRoom, mc.transform.position);
         }
 
         if (Shaker.instance != null)
@@ -310,6 +411,61 @@ public class GameController : MonoBehaviour
             SetBossCombatEnabled(bossIntroRoom, true);
             bossIntroRoom = null;
         }
+    }
+
+    private void SetBossIntroCameraLerp(Room room, float towardTop)
+    {
+        if (room == null || mc == null || mainCam == null)
+        {
+            return;
+        }
+
+        Vector3 playerClamped = GetClampedCameraPosition(room, mc.transform.position);
+        Vector3 topPoint = playerClamped;
+        topPoint.y = GetRoomCameraTopY(room);
+
+        float smooth = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(towardTop));
+        bossIntroCameraOverridePosition = Vector3.Lerp(playerClamped, topPoint, smooth);
+        bossIntroCameraOverridePosition.z = mainCam.transform.position.z;
+        bossIntroCameraOverrideActive = true;
+    }
+
+    private void ClearBossIntroCameraOverride()
+    {
+        bossIntroCameraOverrideActive = false;
+    }
+
+    private Vector3 GetClampedCameraPosition(Room room, Vector3 targetPosition)
+    {
+        if (room == null || mainCam == null)
+        {
+            return targetPosition;
+        }
+
+        float camHalfHeight = mainCam.orthographicSize;
+        float camHalfWidth = camHalfHeight * mainCam.aspect;
+
+        float minX = room.roomBounds.min.x + camHalfWidth;
+        float maxX = room.roomBounds.max.x - camHalfWidth;
+        float minY = room.roomBounds.min.y + camHalfHeight;
+        float maxY = room.roomBounds.max.y - camHalfHeight;
+
+        float clampedX = minX > maxX ? room.roomBounds.center.x : Mathf.Clamp(targetPosition.x, minX, maxX);
+        float clampedY = minY > maxY ? room.roomBounds.center.y : Mathf.Clamp(targetPosition.y, minY, maxY);
+        return new Vector3(clampedX, clampedY, mainCam.transform.position.z);
+    }
+
+    private float GetRoomCameraTopY(Room room)
+    {
+        if (room == null || mainCam == null)
+        {
+            return mainCam != null ? mainCam.transform.position.y : 0f;
+        }
+
+        float camHalfHeight = mainCam.orthographicSize;
+        float minY = room.roomBounds.min.y + camHalfHeight;
+        float maxY = room.roomBounds.max.y - camHalfHeight;
+        return minY > maxY ? room.roomBounds.center.y : maxY;
     }
 
     private EnemyController GetFirstAliveBoss(Room room)
@@ -663,5 +819,171 @@ public class GameController : MonoBehaviour
         float clampedX = minX > maxX ? bounds.center.x : Mathf.Clamp(point.x, minX, maxX);
         float clampedY = minY > maxY ? bounds.center.y : Mathf.Clamp(point.y, minY, maxY);
         return new Vector2(clampedX, clampedY);
+    }
+
+    private void ResetRoomEncounterState(Room room, bool resetBosses, bool resetSpawners)
+    {
+        if (room == null)
+        {
+            return;
+        }
+
+        if (room.IsBossRoom)
+        {
+            StopBossIntroSequence();
+            if (room.BossBound != null)
+            {
+                room.BossBound.SetActive(true);
+            }
+        }
+
+        OpenDoorsInRoom(room);
+
+        HashSet<GameObject> spawnerManaged = GetSpawnerManagedEnemiesInRoom(room);
+        if (resetSpawners)
+        {
+            Spawner[] spawners = room.GetComponentsInChildren<Spawner>(true);
+            for (int i = 0; i < spawners.Length; i++)
+            {
+                if (spawners[i] != null)
+                {
+                    spawners[i].ResetEncounterState();
+                }
+            }
+        }
+
+        if (room.Enemies == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < room.Enemies.Count; i++)
+        {
+            EnemyController enemy = room.Enemies[i];
+            if (enemy == null)
+            {
+                continue;
+            }
+
+            if (!resetBosses && enemy.IsBoss)
+            {
+                continue;
+            }
+
+            if (spawnerManaged.Contains(enemy.gameObject))
+            {
+                continue;
+            }
+
+            enemy.gameObject.SetActive(true);
+            enemy.Respawn();
+            enemy.ResetAggro();
+            enemy.SetCombatEnabled(true);
+            InvokeEncounterReset(enemy.gameObject);
+        }
+    }
+
+    private void OpenDoorsInRoom(Room room)
+    {
+        if (room == null)
+        {
+            return;
+        }
+
+        Door[] doors = room.GetComponentsInChildren<Door>(true);
+        for (int i = 0; i < doors.Length; i++)
+        {
+            if (doors[i] != null)
+            {
+                doors[i].Open();
+            }
+        }
+    }
+
+    private void InvokeEncounterReset(GameObject root)
+    {
+        if (root == null)
+        {
+            return;
+        }
+
+        IEncounterResettable[] resettableComponents = root.GetComponentsInChildren<IEncounterResettable>(true);
+        for (int i = 0; i < resettableComponents.Length; i++)
+        {
+            if (resettableComponents[i] != null)
+            {
+                resettableComponents[i].ResetEncounterState();
+            }
+        }
+    }
+
+    private HashSet<GameObject> GetAllSpawnerManagedEnemies()
+    {
+        HashSet<GameObject> managed = new HashSet<GameObject>();
+        Spawner[] spawners = FindObjectsOfType<Spawner>(true);
+        for (int i = 0; i < spawners.Length; i++)
+        {
+            Spawner spawner = spawners[i];
+            if (spawner == null)
+            {
+                continue;
+            }
+
+            for (int j = 0; j < AllEnemies.Count; j++)
+            {
+                EnemyController enemy = AllEnemies[j];
+                if (enemy == null)
+                {
+                    continue;
+                }
+
+                if (spawner.ContainsEnemy(enemy.gameObject))
+                {
+                    managed.Add(enemy.gameObject);
+                }
+            }
+        }
+
+        return managed;
+    }
+
+    private HashSet<GameObject> GetSpawnerManagedEnemiesInRoom(Room room)
+    {
+        HashSet<GameObject> managed = new HashSet<GameObject>();
+        if (room == null)
+        {
+            return managed;
+        }
+
+        Spawner[] spawners = room.GetComponentsInChildren<Spawner>(true);
+        if (room.Enemies == null)
+        {
+            return managed;
+        }
+
+        for (int i = 0; i < spawners.Length; i++)
+        {
+            Spawner spawner = spawners[i];
+            if (spawner == null)
+            {
+                continue;
+            }
+
+            for (int j = 0; j < room.Enemies.Count; j++)
+            {
+                EnemyController enemy = room.Enemies[j];
+                if (enemy == null)
+                {
+                    continue;
+                }
+
+                if (spawner.ContainsEnemy(enemy.gameObject))
+                {
+                    managed.Add(enemy.gameObject);
+                }
+            }
+        }
+
+        return managed;
     }
 }

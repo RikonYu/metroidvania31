@@ -131,6 +131,7 @@ public class EnemyAI : MonoBehaviour
         alertTimer = 0;
         prepareAttackTimer = 0;
         searchTimer = 0;
+        lastAttackTime = 0f;
         moveInput = Vector2.zero;
         if (rb != null) rb.velocity = Vector2.zero;
 

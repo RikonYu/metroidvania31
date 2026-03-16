@@ -1,13 +1,15 @@
 using System.Collections;
 using UnityEngine;
 
-public class HeartAI : EnemyAI
+public class HeartAI : EnemyAI, IEncounterResettable
 {
     public GameObject LaunchPrefab;
     public GameObject InsectPrefab;
 
     [Header("State 1")]
     public float state1LaunchInterval = 2.5f;
+    public float launchEnemyFlyDuration = 0.8f;
+    public float launchEnemyFallbackSpeed = 8f;
 
     [Header("State 2")]
     public float state2BurstInterval = 1.5f;
@@ -36,10 +38,12 @@ public class HeartAI : EnemyAI
     private float nextStateActionTime;
     private float nextHurtBurstTime;
     private Coroutine revealRoutine;
+    private bool revealPendingStart;
 
     protected override void Start()
     {
         base.Start();
+        Bullet = null;
         currentState = EnemyState.Patrol;
 
         ownerRoom = GetComponentInParent<Room>();
@@ -47,23 +51,15 @@ public class HeartAI : EnemyAI
         if (vesselTransform != null)
         {
             vesselRenderer = vesselTransform.GetComponent<SpriteRenderer>();
-            SetupVesselMask();
-            ApplyHiddenVessel();
         }
 
-        if (controller != null)
-        {
-            controller.Damaged += HandleDamaged;
-        }
+        SubscribeDamageEvent();
+        ResetEncounterState();
+    }
 
-        if (revealDuration > 0f)
-        {
-            revealRoutine = StartCoroutine(RevealVesselRoutine());
-        }
-        else
-        {
-            CompleteReveal();
-        }
+    private void OnEnable()
+    {
+        SubscribeDamageEvent();
     }
 
     private void OnDisable()
@@ -85,6 +81,63 @@ public class HeartAI : EnemyAI
         }
 
         SetAllSectorMasksEnabled(false);
+        revealPendingStart = false;
+    }
+
+    public void ResetEncounterState()
+    {
+        Bullet = null;
+        heartState = 1;
+        nextStateActionTime = 0f;
+        nextHurtBurstTime = 0f;
+        moveInput = Vector2.zero;
+
+        if (rb != null)
+        {
+            rb.velocity = Vector2.zero;
+        }
+
+        if (vesselTransform == null)
+        {
+            vesselTransform = transform.Find("Vessel");
+        }
+        if (vesselTransform != null && vesselRenderer == null)
+        {
+            vesselRenderer = vesselTransform.GetComponent<SpriteRenderer>();
+        }
+
+        if (revealRoutine != null)
+        {
+            StopCoroutine(revealRoutine);
+            revealRoutine = null;
+        }
+
+        if (vesselTransform != null && vesselRenderer != null)
+        {
+            SetupVesselMask();
+            ApplyHiddenVessel();
+            revealPendingStart = true;
+        }
+        else
+        {
+            revealPendingStart = false;
+        }
+    }
+
+    private void SubscribeDamageEvent()
+    {
+        if (controller == null)
+        {
+            controller = GetComponent<EnemyController>();
+        }
+
+        if (controller == null)
+        {
+            return;
+        }
+
+        controller.Damaged -= HandleDamaged;
+        controller.Damaged += HandleDamaged;
     }
 
     protected override void Update()
@@ -98,6 +151,8 @@ public class HeartAI : EnemyAI
             }
             return;
         }
+
+        TryStartPendingReveal();
 
         UpdateCurrentPhase();
 
@@ -146,6 +201,11 @@ public class HeartAI : EnemyAI
         nextHurtBurstTime = Time.time + Mathf.Max(0.01f, hurtBurstCooldown);
     }
 
+    protected override void Attack()
+    {
+        // HeartAI never uses EnemyAI's default Bullet firing.
+    }
+
     private IEnumerator RevealVesselRoutine()
     {
         if (vesselTransform == null || vesselRenderer == null)
@@ -190,8 +250,47 @@ public class HeartAI : EnemyAI
         CompleteReveal();
     }
 
+    private void TryStartPendingReveal()
+    {
+        if (!revealPendingStart || !CanStartRevealNow())
+        {
+            return;
+        }
+
+        revealPendingStart = false;
+        if (revealRoutine != null)
+        {
+            StopCoroutine(revealRoutine);
+        }
+
+        if (revealDuration > 0f)
+        {
+            revealRoutine = StartCoroutine(RevealVesselRoutine());
+        }
+        else
+        {
+            CompleteReveal();
+        }
+    }
+
+    private bool CanStartRevealNow()
+    {
+        if (IsCombatPaused())
+        {
+            return false;
+        }
+
+        if (GameController.instance == null || GameController.instance.mc == null)
+        {
+            return true;
+        }
+
+        return !GameController.instance.mc.IsControlLocked;
+    }
+
     private void CompleteReveal()
     {
+        revealPendingStart = false;
         heartState = controller != null && controller.CurrentHP > 0f ? 2 : 1;
 
         if (vesselRenderer != null)
@@ -253,13 +352,38 @@ public class HeartAI : EnemyAI
 
     private void FireRandomLaunch()
     {
-        if (LaunchPrefab == null || GameController.instance == null)
+        if (LaunchPrefab == null)
         {
             return;
         }
 
         Vector2 fireDirection = GetRandomAllowedDirection();
-        GameController.instance.FireBullet(LaunchPrefab, transform.position, fireDirection, true);
+        Transform parent = transform.parent;
+        GameObject spawned = Instantiate(LaunchPrefab, transform.position, Quaternion.identity, parent);
+        if (spawned == null)
+        {
+            return;
+        }
+
+        MetaBallAI metaBall = spawned.GetComponent<MetaBallAI>();
+        if (metaBall != null)
+        {
+            metaBall.Fly(fireDirection, Mathf.Max(0f, launchEnemyFlyDuration));
+            return;
+        }
+
+        Rigidbody2D launchedRb = spawned.GetComponent<Rigidbody2D>();
+        if (launchedRb != null)
+        {
+            EnemyController launchedController = spawned.GetComponent<EnemyController>();
+            float speed = launchEnemyFallbackSpeed;
+            if (launchedController != null && launchedController.MoveSpeed > 0f)
+            {
+                speed = launchedController.MoveSpeed;
+            }
+
+            launchedRb.velocity = fireDirection * Mathf.Max(0f, speed);
+        }
     }
 
     private void FireRandomInsects(int count)
@@ -277,7 +401,8 @@ public class HeartAI : EnemyAI
 
         for (int i = 0; i < count; i++)
         {
-            GameObject spawned = Instantiate(InsectPrefab, transform.position, Quaternion.identity);
+            Transform parent = transform.parent;
+            GameObject spawned = Instantiate(InsectPrefab, transform.position, Quaternion.identity, parent);
             InsectAI insectAI = spawned.GetComponent<InsectAI>();
             if (insectAI == null)
             {
