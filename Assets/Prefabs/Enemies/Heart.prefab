@@ -108,6 +108,7 @@ MonoBehaviour:
   Waypoints: {fileID: 1558084376845915473}
   wm: {fileID: 0}
   IsBoss: 1
+  CombatEnabled: 1
   flashDuration: 0.15
   flashColor: {r: 1, g: 1, b: 1, a: 1}
 --- !u!114 &6136014292107427388
@@ -140,7 +141,7 @@ MonoBehaviour:
   attackCooldown: 2
   waypointTolerance: 0.5
   searchWaitTime: 2
-  LaunchPrefab: {fileID: 0}
+  LaunchPrefab: {fileID: 163069815059962610, guid: 4fc9c0407875e3144815f7ec749ea0ac, type: 3}
   InsectPrefab: {fileID: 163069815059962610, guid: 67723c7cc803e1147a3a46ec3578f313, type: 3}
   state1LaunchInterval: 2.5
   state2BurstInterval: 1.5

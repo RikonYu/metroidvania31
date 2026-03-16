@@ -14,15 +14,13 @@ public class InsectAI : EnemyAI
     [SerializeField] private float emergeSurfaceOffset = 0.4f;
     [SerializeField] private float emergeLateralRange = 0.75f;
     [SerializeField] private int emergeAttempts = 12;
-
-    private Animator spriteAnimator;
+    [SerializeField] private Sprite PhaseSprite;
     private SpriteRenderer spriteRenderer;
+    private Sprite defaultSprite;
     private Collider2D bodyCollider;
     private Collider2D playerCollider;
 
     private float defaultGravityScale;
-    private float burrowAnimDuration = 0.25f;
-    private string burrowStateName = "insect";
     private bool defaultIsFlying;
     private bool isPhasing;
     private bool phaseTouchedObstacle;
@@ -30,7 +28,6 @@ public class InsectAI : EnemyAI
     private int arcDirection = 1;
     private float phaseTimer;
     private Collider2D phasedObstacle;
-    private Coroutine burrowRoutine;
     private bool spawnDirectlyInChase;
 
     protected override void Start()
@@ -40,8 +37,11 @@ public class InsectAI : EnemyAI
         Transform sprite = transform.Find("Sprite");
         if (sprite != null)
         {
-            spriteAnimator = sprite.GetComponent<Animator>();
             spriteRenderer = sprite.GetComponent<SpriteRenderer>();
+            if (spriteRenderer != null)
+            {
+                defaultSprite = spriteRenderer.sprite;
+            }
         }
 
         bodyCollider = GetComponent<Collider2D>();
@@ -55,20 +55,20 @@ public class InsectAI : EnemyAI
             rb.gravityScale = 0f;
             rb.velocity = Vector2.zero;
         }
-
-        if (spriteAnimator != null && spriteAnimator.runtimeAnimatorController != null)
-        {
-            AnimationClip[] clips = spriteAnimator.runtimeAnimatorController.animationClips;
-            if (clips != null && clips.Length > 0 && clips[0] != null)
-            {
-                burrowAnimDuration = Mathf.Max(0.01f, clips[0].length);
-                burrowStateName = clips[0].name;
-            }
-        }
     }
 
     protected override void Update()
     {
+        if (IsCombatPaused())
+        {
+            moveInput = Vector2.zero;
+            if (rb != null)
+            {
+                rb.velocity = Vector2.zero;
+            }
+            return;
+        }
+
         UpdatePhase();
 
         if (playerTransform == null)
@@ -89,6 +89,15 @@ public class InsectAI : EnemyAI
 
     private void FixedUpdate()
     {
+        if (IsCombatPaused())
+        {
+            if (rb != null)
+            {
+                rb.velocity = Vector2.zero;
+            }
+            return;
+        }
+
         if (rb == null || controller == null)
         {
             return;
@@ -389,11 +398,7 @@ public class InsectAI : EnemyAI
             rb.velocity = Vector2.zero;
         }
 
-        if (burrowRoutine != null)
-        {
-            StopCoroutine(burrowRoutine);
-        }
-        burrowRoutine = StartCoroutine(BurrowInRoutine());
+        SetPhaseSprite(true);
     }
 
     private void FinishPhasing()
@@ -425,11 +430,7 @@ public class InsectAI : EnemyAI
             rb.velocity = Vector2.zero;
         }
 
-        if (burrowRoutine != null)
-        {
-            StopCoroutine(burrowRoutine);
-        }
-        burrowRoutine = StartCoroutine(BurrowOutRoutine());
+        SetPhaseSprite(false);
     }
 
     private void StopPhasing(bool forceVisible)
@@ -447,70 +448,10 @@ public class InsectAI : EnemyAI
             rb.velocity = Vector2.zero;
         }
 
-        if (burrowRoutine != null)
+        if (forceVisible)
         {
-            StopCoroutine(burrowRoutine);
-            burrowRoutine = null;
+            SetPhaseSprite(false);
         }
-
-        if (spriteAnimator != null)
-        {
-            spriteAnimator.enabled = false;
-        }
-
-        if (forceVisible && spriteRenderer != null)
-        {
-            spriteRenderer.enabled = true;
-        }
-    }
-
-    private IEnumerator BurrowInRoutine()
-    {
-        PlayBurrowAnimation(1f, 0f);
-        yield return new WaitForSeconds(burrowAnimDuration);
-
-        if (isPhasing && spriteRenderer != null)
-        {
-            spriteRenderer.enabled = false;
-        }
-
-        if (spriteAnimator != null)
-        {
-            spriteAnimator.enabled = false;
-        }
-
-        burrowRoutine = null;
-    }
-
-    private IEnumerator BurrowOutRoutine()
-    {
-        if (spriteRenderer != null)
-        {
-            spriteRenderer.enabled = true;
-        }
-
-        PlayBurrowAnimation(-1f, 1f);
-        yield return new WaitForSeconds(burrowAnimDuration);
-
-        if (spriteAnimator != null)
-        {
-            spriteAnimator.enabled = false;
-        }
-
-        burrowRoutine = null;
-    }
-
-    private void PlayBurrowAnimation(float speed, float normalizedTime)
-    {
-        if (spriteAnimator == null)
-        {
-            return;
-        }
-
-        spriteAnimator.enabled = true;
-        spriteAnimator.speed = speed;
-        spriteAnimator.Play(burrowStateName, 0, normalizedTime);
-        spriteAnimator.Update(0f);
     }
 
     private void ResolveEmergenceOverlap()
@@ -744,6 +685,27 @@ public class InsectAI : EnemyAI
         if (room != null)
         {
             room.Enemies.Remove(controller);
+        }
+    }
+
+    private void SetPhaseSprite(bool phased)
+    {
+        if (spriteRenderer == null)
+        {
+            return;
+        }
+
+        spriteRenderer.enabled = true;
+
+        if (phased && PhaseSprite != null)
+        {
+            spriteRenderer.sprite = PhaseSprite;
+            return;
+        }
+
+        if (defaultSprite != null)
+        {
+            spriteRenderer.sprite = defaultSprite;
         }
     }
 }

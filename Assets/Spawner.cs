@@ -1,0 +1,162 @@
+using System.Collections.Generic;
+using UnityEngine;
+
+[System.Serializable]
+public class SpawnerWave
+{
+    public List<GameObject> enemies = new List<GameObject>();
+}
+
+public class Spawner : MonoBehaviour
+{
+    [Header("Waves")]
+    public List<SpawnerWave> waves = new List<SpawnerWave>();
+
+    [Header("Rewards")]
+    public List<GameObject> rewards = new List<GameObject>();
+
+    private int currentWaveIndex = -1;
+    private bool initialized;
+    private bool completed;
+
+    private void OnEnable()
+    {
+        if (completed)
+        {
+            return;
+        }
+
+        if (!initialized)
+        {
+            initialized = true;
+            SetAllWaveEnemiesActive(false);
+            SetRewardsActive(false);
+            ActivateNextWave();
+        }
+    }
+
+    private void Update()
+    {
+        if (completed || currentWaveIndex < 0 || currentWaveIndex >= waves.Count)
+        {
+            return;
+        }
+
+        if (IsWaveCleared(waves[currentWaveIndex]))
+        {
+            ActivateNextWave();
+        }
+    }
+
+    private void ActivateNextWave()
+    {
+        while (true)
+        {
+            currentWaveIndex++;
+
+            if (currentWaveIndex >= waves.Count)
+            {
+                CompleteSpawner();
+                return;
+            }
+
+            ActivateWave(waves[currentWaveIndex]);
+
+            if (!IsWaveCleared(waves[currentWaveIndex]))
+            {
+                return;
+            }
+        }
+    }
+
+    private void ActivateWave(SpawnerWave wave)
+    {
+        if (wave == null || wave.enemies == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < wave.enemies.Count; i++)
+        {
+            GameObject enemy = wave.enemies[i];
+            if (enemy != null)
+            {
+                enemy.SetActive(true);
+            }
+        }
+    }
+
+    private bool IsWaveCleared(SpawnerWave wave)
+    {
+        if (wave == null || wave.enemies == null || wave.enemies.Count == 0)
+        {
+            return true;
+        }
+
+        for (int i = 0; i < wave.enemies.Count; i++)
+        {
+            GameObject enemy = wave.enemies[i];
+            if (enemy == null)
+            {
+                continue;
+            }
+
+            if (enemy.activeInHierarchy)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private void CompleteSpawner()
+    {
+        completed = true;
+        SetRewardsActive(true);
+        Destroy(gameObject);
+    }
+
+    private void SetAllWaveEnemiesActive(bool active)
+    {
+        if (waves == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < waves.Count; i++)
+        {
+            SpawnerWave wave = waves[i];
+            if (wave == null || wave.enemies == null)
+            {
+                continue;
+            }
+
+            for (int j = 0; j < wave.enemies.Count; j++)
+            {
+                GameObject enemy = wave.enemies[j];
+                if (enemy != null)
+                {
+                    enemy.SetActive(active);
+                }
+            }
+        }
+    }
+
+    private void SetRewardsActive(bool active)
+    {
+        if (rewards == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < rewards.Count; i++)
+        {
+            GameObject reward = rewards[i];
+            if (reward != null)
+            {
+                reward.SetActive(active);
+            }
+        }
+    }
+}

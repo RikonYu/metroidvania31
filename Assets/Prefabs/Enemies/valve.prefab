@@ -102,10 +102,14 @@ MonoBehaviour:
   CurrentHP: 0
   MoveSpeed: 0
   CollideDamage: 0
+  stunDuration: 0.25
+  knockbackForce: 10
   IsFlying: 1
   Waypoints: {fileID: 1558084376845915473}
   wm: {fileID: 0}
   IsBoss: 0
+  flashDuration: 0.15
+  flashColor: {r: 1, g: 1, b: 1, a: 1}
 --- !u!114 &3432635388013242495
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -124,7 +128,7 @@ MonoBehaviour:
   Portion:
   - 1
   currentState: 0
-  viewAngle: 90
+  viewAngle: 360
   viewRadius: 10
   chaseRadius: 15
   obstacleMask:

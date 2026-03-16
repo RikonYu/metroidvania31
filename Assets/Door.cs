@@ -1,40 +1,54 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
-public class Door : Interactable
+public class Door : MonoBehaviour
 {
-    public bool IsSatisfied;
-    public GameObject Obs;
-    BoxCollider2D col;
-    // Start is called before the first frame update
-    void Start()
+    public Sprite spr1; // opened
+    public Sprite spr2; // closed
+    public bool startOpened;
+
+    private SpriteRenderer spriteRenderer;
+    private BoxCollider2D obstacleCollider;
+
+    private void Awake()
     {
-        col = GetComponent<BoxCollider2D>();
-        Obs.GetComponent<BoxCollider2D>().size = col.size;
-        Obs.GetComponent<BoxCollider2D>().offset = col.offset;
+        spriteRenderer = GetComponent<SpriteRenderer>();
+        obstacleCollider = GetComponent<BoxCollider2D>();
+
+        if (obstacleCollider != null)
+        {
+            obstacleCollider.isTrigger = false;
+        }
+
+        SetOpen(startOpened);
     }
 
-    public override void OnTriggerEnter2D(Collider2D other)
-    {
-        base.OnTriggerEnter2D(other);
-    }
-
-    public override void OnTriggerExit2D(Collider2D other)
-    {
-        base.OnTriggerExit2D(other);
-    }
     public void Open()
     {
-
+        SetOpen(true);
     }
 
-    public override void Interact()
+    public void Close()
     {
-        if (IsSatisfied)
+        SetOpen(false);
+    }
+
+    public void SetOpen(bool isOpen)
+    {
+        if (spriteRenderer != null)
         {
-            Obs.SetActive(false);
-            Open();
+            if (isOpen && spr1 != null)
+            {
+                spriteRenderer.sprite = spr1;
+            }
+            else if (!isOpen && spr2 != null)
+            {
+                spriteRenderer.sprite = spr2;
+            }
+        }
+
+        if (obstacleCollider != null)
+        {
+            obstacleCollider.enabled = !isOpen;
         }
     }
 }

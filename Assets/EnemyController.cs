@@ -16,6 +16,7 @@ public class EnemyController : MonoBehaviour
     protected Vector3 StartPos;
     bool IsDead;
     public bool IsBoss;
+    public bool CombatEnabled = true;
     EnemyAI AI;
 
     // --- 新增：闪光效果所需变量 ---
@@ -28,6 +29,11 @@ public class EnemyController : MonoBehaviour
     // --- 新增：破损粒子效果所需变量 ---
     private ParticleSystem damageParticles;
     public event System.Action<float> Damaged;
+    public event System.Action<bool> FrozenStateChanged;
+    private int lastPlayerContactFrame = -1;
+    private float freezeTimer;
+
+    public bool IsFrozen => freezeTimer > 0f;
 
     private void Awake()
     {
@@ -45,7 +51,7 @@ public class EnemyController : MonoBehaviour
         // 初始化受损粒子系统
         InitDamageParticles();
 
-        transform.parent.gameObject.GetComponent<Room>().Enemies.Add(this);
+        transform.parent.gameObject.GetComponent<Room>()?.Enemies.Add(this);
         GameController.instance.AllEnemies.Add(this);
         if (IsFlying)
             GetComponent<Rigidbody2D>().gravityScale = 0f;
@@ -56,6 +62,7 @@ public class EnemyController : MonoBehaviour
         IsDead = false;
         CurrentHP = MaxHP;
         transform.position = StartPos;
+        freezeTimer = 0f;
 
         // 恢复正常外观和状态
         if (spriteRenderer != null) spriteRenderer.color = originalColor;
@@ -81,6 +88,16 @@ public class EnemyController : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        if (freezeTimer > 0f)
+        {
+            freezeTimer -= Time.deltaTime;
+            if (freezeTimer <= 0f)
+            {
+                freezeTimer = 0f;
+                FrozenStateChanged?.Invoke(false);
+            }
+        }
+
         if (CurrentHP <= 0 && !IsDead)
         {
             Die();
@@ -93,8 +110,17 @@ public class EnemyController : MonoBehaviour
 
         // 死亡时停止粒子发射
         if (damageParticles != null) damageParticles.Stop();
+        if (IsBoss && Shaker.instance != null)
+        {
+            Shaker.instance.ShakeBossDefeat();
+        }
 
         gameObject.SetActive(false);
+    }
+
+    public void SetCombatEnabled(bool enabled)
+    {
+        CombatEnabled = enabled;
     }
 
     public void Hurt(float dmg)
@@ -118,7 +144,24 @@ public class EnemyController : MonoBehaviour
 
     public void Freeze(float duration)
     {
+        if (duration <= 0f)
+        {
+            return;
+        }
 
+        bool wasFrozen = IsFrozen;
+        freezeTimer = Mathf.Max(freezeTimer, duration);
+        if (!wasFrozen)
+        {
+            FrozenStateChanged?.Invoke(true);
+        }
+
+        Rigidbody2D enemyRb = GetComponent<Rigidbody2D>();
+        if (enemyRb != null)
+        {
+            enemyRb.velocity = Vector2.zero;
+            enemyRb.angularVelocity = 0f;
+        }
     }
 
     // --- 新增：处理闪光渐变的协程 ---
@@ -220,27 +263,45 @@ public class EnemyController : MonoBehaviour
 
     protected virtual void OnCollisionEnter2D(Collision2D collision)
     {
-        MCController player = collision.gameObject.GetComponent<MCController>();
+        ApplyContactDamage(collision.gameObject, transform.position);
+    }
 
-        if (player != null)
+    protected virtual void OnTriggerEnter2D(Collider2D other)
+    {
+        ApplyContactDamage(other.gameObject, transform.position);
+    }
+
+    public void ApplyContactDamage(GameObject target, Vector3 hitSourcePosition)
+    {
+        if (target == null)
         {
-            bool isdead = CollideDamage >= player.CurrentHealth;
-            player.ApplyDamageAndStun(CollideDamage, stunDuration);
-
-            Rigidbody2D playerRb = collision.gameObject.GetComponent<Rigidbody2D>();
-            if (playerRb != null && !isdead)
-            {
-                Vector2 direction = (collision.transform.position - transform.position).normalized;
-
-                if (direction.y <= 0.2f)
-                {
-                    direction.y = 0.8f;
-                }
-
-                direction = direction.normalized;
-                playerRb.velocity = Vector2.zero;
-                playerRb.AddForce(direction * knockbackForce, ForceMode2D.Impulse);
-            }
+            return;
         }
+
+        MCController player = target.GetComponentInParent<MCController>();
+        if (player == null || Time.frameCount == lastPlayerContactFrame)
+        {
+            return;
+        }
+
+        lastPlayerContactFrame = Time.frameCount;
+        bool isdead = CollideDamage >= player.CurrentHealth;
+        player.ApplyDamageAndStun(CollideDamage, stunDuration);
+
+        Rigidbody2D playerRb = player.GetComponent<Rigidbody2D>();
+        if (playerRb == null || isdead)
+        {
+            return;
+        }
+
+        Vector2 direction = ((Vector2)player.transform.position - (Vector2)hitSourcePosition).normalized;
+        if (direction.y <= 0.2f)
+        {
+            direction.y = 0.8f;
+        }
+
+        direction = direction.normalized;
+        playerRb.velocity = Vector2.zero;
+        playerRb.AddForce(direction * knockbackForce, ForceMode2D.Impulse);
     }
 }

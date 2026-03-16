@@ -31,6 +31,16 @@ public class StandStillAI : EnemyAI
 
     protected override void Update()
     {
+        if (IsCombatPaused())
+        {
+            moveInput = Vector2.zero;
+            if (rb != null)
+            {
+                rb.velocity = Vector2.zero;
+            }
+            return;
+        }
+
         for (int i = StageNum - 1; i >= 0; i--)
         {
             if (controller.CurrentHP / controller.MaxHP <= Portion[i])

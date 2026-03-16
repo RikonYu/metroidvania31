@@ -14,6 +14,7 @@ public class MCController : MonoBehaviour
     public float EnergyRegenRate = 15f;
     public GameObject[] WeaponList;
     public GameObject BulletPrefab;
+    [SerializeField] private float flameSpreadAngle = 6f;
     private const int WeaponSlotCount = 4;
     private readonly GameObject[] weaponSlots = new GameObject[WeaponSlotCount];
     private readonly bool[] unlockedWeapons = new bool[WeaponSlotCount];
@@ -54,6 +55,7 @@ public class MCController : MonoBehaviour
     [SerializeField] private float baseGravityScale = 4f;
     [SerializeField] private float baseSpaceGravityScale = 0.5f;
     [SerializeField] private float maxFallSpeed = 25f;
+    [SerializeField] private float hardLandingShakeCooldown = 0.18f;
 
     [Header("Drop Down System")]
     [SerializeField] private float dropDownDuration = 0.4f;
@@ -93,9 +95,13 @@ public class MCController : MonoBehaviour
 
     private Platform currentPlatform;
     private Track currentTrack;
+    private Transform fireSpot;
+    private bool controlsLocked;
+    private float lockedGravityScale;
 
     float freezeCounter;
     float slidetime;
+    float hardLandingShakeTimer;
 
     void Start()
     {
@@ -103,6 +109,7 @@ public class MCController : MonoBehaviour
         rb.freezeRotation = true;
         handup = transform.Find("handup").gameObject;
         handdown = transform.Find("hand").gameObject;
+        fireSpot = transform.Find("firespot");
         handup.SetActive(false);
         rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
 
@@ -276,7 +283,16 @@ public class MCController : MonoBehaviour
 
         Vector3 worldPosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
         worldPosition.z = 0;
-        GameController.instance.FireBullet(BulletPrefab, transform.position, worldPosition - transform.position, false);
+        Vector3 startPos = GetFirePosition();
+        Vector2 fireDirection = worldPosition - startPos;
+
+        if (BulletPrefab != null && BulletPrefab.GetComponent<FlameBullet>() != null && flameSpreadAngle > 0f)
+        {
+            float randomOffset = Random.Range(-flameSpreadAngle, flameSpreadAngle);
+            fireDirection = Quaternion.Euler(0f, 0f, randomOffset) * fireDirection;
+        }
+
+        GameController.instance.FireBullet(BulletPrefab, startPos, fireDirection, false);
     }
 
     private void FireChargeWeapon(float chargeTime, float maxChargeTime, float cost)
@@ -286,10 +302,35 @@ public class MCController : MonoBehaviour
 
         float ratio = Mathf.Clamp01(chargeTime / maxChargeTime);
         ChargeBullet.NextChargeRatio = ratio;
+        if (Shaker.instance != null)
+        {
+            Shaker.instance.ShakeChargeShot(ratio);
+        }
 
         Vector3 worldPosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
         worldPosition.z = 0;
-        GameController.instance.FireBullet(BulletPrefab, transform.position, worldPosition - transform.position, false);
+        Vector3 startPos = GetFirePosition();
+        GameController.instance.FireBullet(BulletPrefab, startPos, worldPosition - startPos, false);
+    }
+
+    private Vector3 GetFirePosition()
+    {
+        if (fireSpot == null)
+        {
+            return transform.position;
+        }
+
+        LayerMask wallMask = LayerMask.GetMask("ground", "obstacle");
+        if (wallMask.value != 0)
+        {
+            Collider2D hit = Physics2D.OverlapPoint(fireSpot.position, wallMask);
+            if (hit != null)
+            {
+                return transform.position;
+            }
+        }
+
+        return fireSpot.position;
     }
 
     public void SetCanClimb(bool can, Ladder lad)
@@ -352,6 +393,14 @@ public class MCController : MonoBehaviour
     void Update()
     {
         UIController.instance.SetEnergy(this.CurrentEnergy, this.MaxEnergy);
+        if (controlsLocked)
+        {
+            handup.SetActive(false);
+            handdown.SetActive(true);
+            UpdateAnimationParameters();
+            return;
+        }
+
         if (isSliding)
         {
             handup.SetActive(false);
@@ -375,6 +424,7 @@ public class MCController : MonoBehaviour
 
         if (freezeCounter > 0f) freezeCounter -= Time.deltaTime;
         if (slideCooldownCounter > 0f) slideCooldownCounter -= Time.deltaTime;
+        if (hardLandingShakeTimer > 0f) hardLandingShakeTimer -= Time.deltaTime;
         firecd -= Time.deltaTime;
         timeSinceLastJump += Time.deltaTime;
 
@@ -491,7 +541,22 @@ public class MCController : MonoBehaviour
 
     void FixedUpdate()
     {
+        if (controlsLocked)
+        {
+            if (rb != null)
+            {
+                rb.velocity = Vector2.zero;
+                rb.gravityScale = 0f;
+            }
+            UpdateAnimationParameters();
+            return;
+        }
+
+        float preGroundCheckVelocityY = rb != null ? rb.velocity.y : 0f;
+        bool wasGroundedBeforeCheck = isGrounded;
+
         CheckGround();
+        TryTriggerHardLandingShake(preGroundCheckVelocityY, wasGroundedBeforeCheck);
         UpdateSafePosition();
 
         if (isStunned)
@@ -806,6 +871,7 @@ public class MCController : MonoBehaviour
 
     public void Respawn(bool isDropped)
     {
+        SetControlLocked(false);
         firecd = 0f;
         rb.velocity = Vector2.zero;
         isStunned = false;
@@ -832,12 +898,46 @@ public class MCController : MonoBehaviour
     public void Hurt(float dmg)
     {
         if (isSliding) return;
+        if (dmg <= 0f) return;
 
         CurrentHealth -= dmg;
         if (CurrentHealth <= 0f) CurrentHealth = 0f;
+
+        if (Shaker.instance != null)
+        {
+            Shaker.instance.ShakePlayerHurt(dmg, MaxHealth);
+        }
+
         UIController.instance.SetHP(CurrentHealth, MaxHealth);
         if (CurrentHealth <= 0f)
             GameController.instance.Die(false);
+    }
+
+    private void TryTriggerHardLandingShake(float preGroundCheckVelocityY, bool wasGroundedBeforeCheck)
+    {
+        if (hardLandingShakeTimer > 0f)
+        {
+            return;
+        }
+
+        if (wasGroundedBeforeCheck || !isGrounded)
+        {
+            return;
+        }
+
+        float impactSpeed = -preGroundCheckVelocityY;
+        float threshold = Mathf.Max(0.01f, maxFallSpeed - 0.01f);
+        if (impactSpeed < threshold)
+        {
+            return;
+        }
+
+        if (Shaker.instance != null)
+        {
+            Shaker.instance.ShakeMaxSpeedLanding(impactSpeed, maxFallSpeed);
+        }
+
+        hardLandingShakeTimer = hardLandingShakeCooldown;
     }
 
     private void OnDrawGizmos()
@@ -1057,6 +1157,46 @@ public class MCController : MonoBehaviour
         if (UIController.instance != null)
         {
             UIController.instance.UpdateWeaponIcons(unlockedWeapons, currentWeaponIndex);
+        }
+    }
+
+    public void SetControlLocked(bool locked)
+    {
+        if (controlsLocked == locked)
+        {
+            return;
+        }
+
+        controlsLocked = locked;
+        if (rb == null)
+        {
+            rb = GetComponent<Rigidbody2D>();
+        }
+
+        if (controlsLocked)
+        {
+            lockedGravityScale = rb != null ? rb.gravityScale : 0f;
+            horizontalInput = 0f;
+            isCharging = false;
+            firecd = Mathf.Max(0f, firecd);
+
+            if (isClimbing)
+            {
+                StopClimbing();
+            }
+
+            if (rb != null)
+            {
+                rb.velocity = Vector2.zero;
+                rb.gravityScale = 0f;
+            }
+
+            handup.SetActive(false);
+            handdown.SetActive(true);
+        }
+        else if (rb != null)
+        {
+            rb.gravityScale = lockedGravityScale;
         }
     }
 }

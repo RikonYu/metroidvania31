@@ -38,10 +38,83 @@ public class Utils
 
     public static void SnapToGround(GameObject obj, float snapDistance, LayerMask groundLayer)
     {
-        RaycastHit2D hit = Physics2D.Raycast(obj.transform.position, Vector2.down, snapDistance, groundLayer);
+        if (obj == null)
+        {
+            return;
+        }
+
+        Collider2D[] colliders = obj.GetComponentsInChildren<Collider2D>(true);
+        if (colliders == null || colliders.Length == 0)
+        {
+            RaycastHit2D fallbackHit = Physics2D.Raycast(obj.transform.position, Vector2.down, snapDistance, groundLayer);
+            if (fallbackHit.collider != null)
+            {
+                obj.transform.position = new Vector3(obj.transform.position.x, fallbackHit.point.y, obj.transform.position.z);
+            }
+            return;
+        }
+
+        bool hasBounds = false;
+        bool hasNonTrigger = false;
+        Bounds bounds = new Bounds(obj.transform.position, Vector3.zero);
+
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            Collider2D c = colliders[i];
+            if (c == null || !c.enabled || c.isTrigger)
+            {
+                continue;
+            }
+
+            if (!hasBounds)
+            {
+                bounds = c.bounds;
+                hasBounds = true;
+            }
+            else
+            {
+                bounds.Encapsulate(c.bounds);
+            }
+            hasNonTrigger = true;
+        }
+
+        if (!hasNonTrigger)
+        {
+            for (int i = 0; i < colliders.Length; i++)
+            {
+                Collider2D c = colliders[i];
+                if (c == null || !c.enabled)
+                {
+                    continue;
+                }
+
+                if (!hasBounds)
+                {
+                    bounds = c.bounds;
+                    hasBounds = true;
+                }
+                else
+                {
+                    bounds.Encapsulate(c.bounds);
+                }
+            }
+        }
+
+        if (!hasBounds)
+        {
+            return;
+        }
+
+        float bottomOffset = obj.transform.position.y - bounds.min.y;
+        float castDistance = snapDistance + Mathf.Max(0f, bounds.size.y) + 0.2f;
+        Vector2 rayOrigin = new Vector2(obj.transform.position.x, bounds.max.y + 0.1f);
+        RaycastHit2D hit = Physics2D.Raycast(rayOrigin, Vector2.down, castDistance, groundLayer);
         if (hit.collider != null)
         {
-            obj.transform.position = new Vector3(hit.point.x, hit.point.y + obj.GetComponent<BoxCollider2D>().size.y / 2f, obj.transform.position.z);
+            obj.transform.position = new Vector3(
+                obj.transform.position.x,
+                hit.point.y + bottomOffset,
+                obj.transform.position.z);
         }
     }
 }

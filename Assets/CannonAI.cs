@@ -29,6 +29,16 @@ public class CannonAI : EnemyAI
 
     protected override void Update()
     {
+        if (IsCombatPaused())
+        {
+            if (rb != null)
+            {
+                rb.velocity = Vector2.zero;
+            }
+            StopLaser(false);
+            return;
+        }
+
         UpdateCurrentPhase();
 
         if (rb != null)

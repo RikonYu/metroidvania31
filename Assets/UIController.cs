@@ -66,16 +66,20 @@ public class UIController : MonoBehaviour
     }
     public void SetHP(float currenthp, float maxhp)
     {
-        HP.GetComponent<RectTransform>().sizeDelta = new Vector2(HPLenUnit * currenthp, 100f);
-        HPBG.GetComponent<RectTransform>().sizeDelta = new Vector2(HPLenUnit * maxhp, 100f);
-        HPB.GetComponent<RectTransform>().sizeDelta = new Vector2(HPLenUnit * maxhp+200f, 200f);
+        float safeMaxHP = Mathf.Max(0f, maxhp);
+        float safeCurrentHP = Mathf.Clamp(currenthp, 0f, safeMaxHP);
+        SetRectWidth(HP, HPLenUnit * safeCurrentHP, 100f);
+        SetRectWidth(HPBG, HPLenUnit * safeMaxHP, 100f);
+        SetRectWidth(HPB, HPLenUnit * safeMaxHP + 200f, 200f);
     }
 
     public void SetEnergy(float currentEnergy, float maxEnergy)
     {
-        AM.GetComponent<RectTransform>().sizeDelta = new Vector2(EnergyLenUnit * currentEnergy, 100f);
-        AMBG.GetComponent<RectTransform>().sizeDelta = new Vector2(EnergyLenUnit * maxEnergy, 100f);
-        AMB.GetComponent<RectTransform>().sizeDelta = new Vector2(EnergyLenUnit * maxEnergy + 200f, 200f);
+        float safeMaxEnergy = Mathf.Max(0f, maxEnergy);
+        float safeCurrentEnergy = Mathf.Clamp(currentEnergy, 0f, safeMaxEnergy);
+        SetRectWidth(AM, EnergyLenUnit * safeCurrentEnergy, 100f);
+        SetRectWidth(AMBG, EnergyLenUnit * safeMaxEnergy, 100f);
+        SetRectWidth(AMB, EnergyLenUnit * safeMaxEnergy + 200f, 200f);
     }
     public void HideBossHP()
     {
@@ -87,14 +91,15 @@ public class UIController : MonoBehaviour
 
         BossHPParent.SetActive(true);
         BossHPParent.transform.Find("text").GetComponent<TMP_Text>().text = name;
+        SetBossHPRevealScale(1f);
         SetBossHP(maxhp, maxhp);
 
     }
     public void SetBossHP(float currenthp, float maxhp)
     {
-        HP.GetComponent<RectTransform>().sizeDelta = new Vector2(HPLenUnit * currenthp, 100f);
-        HPBG.GetComponent<RectTransform>().sizeDelta = new Vector2(HPLenUnit * maxhp, 100f);
-        BOSSHP.GetComponent<RectTransform>().sizeDelta = new Vector2(1600f * currenthp / maxhp, 100f);
+        float safeMaxHP = Mathf.Max(0.0001f, maxhp);
+        float safeCurrentHP = Mathf.Clamp(currenthp, 0f, safeMaxHP);
+        SetRectWidth(BOSSHP, 1600f * safeCurrentHP / safeMaxHP, 100f);
     }
 
     public void ToggleMinimap()
@@ -196,6 +201,33 @@ public class UIController : MonoBehaviour
         Color color = text.color;
         color.a = alpha;
         text.color = color;
+    }
+
+    private void SetRectWidth(GameObject target, float width, float height)
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        RectTransform rect = target.GetComponent<RectTransform>();
+        if (rect == null)
+        {
+            return;
+        }
+
+        rect.sizeDelta = new Vector2(Mathf.Max(0f, width), height);
+    }
+
+    public void SetBossHPRevealScale(float scale)
+    {
+        if (BossHPParent == null)
+        {
+            return;
+        }
+
+        float clamped = Mathf.Clamp01(scale);
+        BossHPParent.transform.localScale = new Vector3(clamped, 1f, 1f);
     }
 
 }

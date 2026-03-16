@@ -62,7 +62,7 @@ BoxCollider2D:
     adaptiveTiling: 0
   m_AutoTiling: 0
   serializedVersion: 2
-  m_Size: {x: 1, y: 1}
+  m_Size: {x: 1.5, y: 1.5}
   m_EdgeRadius: 0
 --- !u!50 &163069815059962608
 Rigidbody2D:
@@ -99,7 +99,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   MaxHP: 1
   CurrentHP: 0
-  MoveSpeed: 10
+  MoveSpeed: 8
   CollideDamage: 1
   stunDuration: 0.25
   knockbackForce: 10
@@ -107,6 +107,7 @@ MonoBehaviour:
   Waypoints: {fileID: 1558084376845915473}
   wm: {fileID: 0}
   IsBoss: 0
+  CombatEnabled: 1
   flashDuration: 0.15
   flashColor: {r: 1, g: 1, b: 1, a: 1}
 --- !u!114 &7734213302625417337
@@ -128,8 +129,8 @@ MonoBehaviour:
   - 1
   currentState: 0
   viewAngle: 90
-  viewRadius: 10
-  chaseRadius: 15
+  viewRadius: 25
+  chaseRadius: 25
   obstacleMask:
     serializedVersion: 2
     m_Bits: 192
@@ -147,6 +148,7 @@ MonoBehaviour:
   emergeSurfaceOffset: 0.4
   emergeLateralRange: 0.75
   emergeAttempts: 12
+  PhaseSprite: {fileID: 21300000, guid: df92b80f406b4c04ebf48500aa4decce, type: 3}
 --- !u!1 &163069816326980511
 GameObject:
   m_ObjectHideFlags: 0
@@ -157,7 +159,6 @@ GameObject:
   m_Component:
   - component: {fileID: 163069816326980510}
   - component: {fileID: 163069816326980509}
-  - component: {fileID: 8463489119018838489}
   m_Layer: 8
   m_Name: Sprite
   m_TagString: Untagged
@@ -232,26 +233,6 @@ SpriteRenderer:
   m_WasSpriteAssigned: 1
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
---- !u!95 &8463489119018838489
-Animator:
-  serializedVersion: 4
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 163069816326980511}
-  m_Enabled: 0
-  m_Avatar: {fileID: 0}
-  m_Controller: {fileID: 9100000, guid: 7a89011ee367a8642982796ab21e772c, type: 2}
-  m_CullingMode: 0
-  m_UpdateMode: 0
-  m_ApplyRootMotion: 0
-  m_LinearVelocityBlending: 0
-  m_StabilizeFeet: 0
-  m_WarningMessage: 
-  m_HasTransformHierarchy: 1
-  m_AllowConstantClipSamplingOptimization: 1
-  m_KeepAnimatorControllerStateOnDisable: 0
 --- !u!1 &163069816730416814
 GameObject:
   m_ObjectHideFlags: 0

@@ -76,6 +76,16 @@ public class EnemyAI : MonoBehaviour
 
     protected virtual void Update()
     {
+        if (IsCombatPaused())
+        {
+            moveInput = Vector2.zero;
+            if (rb != null)
+            {
+                rb.velocity = Vector2.zero;
+            }
+            return;
+        }
+
         for (int i = StageNum - 1; i >= 0; i--)
         {
             if (controller.CurrentHP / controller.MaxHP <= Portion[i])
@@ -360,5 +370,10 @@ public class EnemyAI : MonoBehaviour
                 angleInDegrees += 0;
         }
         return new Vector3(Mathf.Sin(angleInDegrees * Mathf.Deg2Rad), Mathf.Cos(angleInDegrees * Mathf.Deg2Rad), 0);
+    }
+
+    protected bool IsCombatPaused()
+    {
+        return controller != null && !controller.CombatEnabled;
     }
 }

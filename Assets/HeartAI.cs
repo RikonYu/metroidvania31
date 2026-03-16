@@ -20,12 +20,17 @@ public class HeartAI : EnemyAI
     public float revealDuration = 8f;
 
     private const float ForbiddenAngle = 30f;
+    private const int RevealSectorCount = 8;
+    private const float RevealHalfAngle = 22.5f;
 
     private Room ownerRoom;
     private SpriteRenderer vesselRenderer;
     private Transform vesselTransform;
-    private Vector3 vesselBaseLocalPosition;
-    private Vector3 vesselBaseLocalScale;
+    private Transform revealMaskRoot;
+    private readonly Transform[] sectorMaskTransforms = new Transform[RevealSectorCount];
+    private readonly SpriteMask[] sectorMasks = new SpriteMask[RevealSectorCount];
+    private readonly float[] sectorRevealProgress = new float[RevealSectorCount];
+    private Vector2 vesselHalfSize;
 
     private int heartState = 1;
     private float nextStateActionTime;
@@ -42,8 +47,7 @@ public class HeartAI : EnemyAI
         if (vesselTransform != null)
         {
             vesselRenderer = vesselTransform.GetComponent<SpriteRenderer>();
-            vesselBaseLocalPosition = vesselTransform.localPosition;
-            vesselBaseLocalScale = vesselTransform.localScale;
+            SetupVesselMask();
             ApplyHiddenVessel();
         }
 
@@ -74,10 +78,27 @@ public class HeartAI : EnemyAI
             StopCoroutine(revealRoutine);
             revealRoutine = null;
         }
+
+        if (vesselRenderer != null)
+        {
+            vesselRenderer.maskInteraction = SpriteMaskInteraction.None;
+        }
+
+        SetAllSectorMasksEnabled(false);
     }
 
     protected override void Update()
     {
+        if (IsCombatPaused())
+        {
+            moveInput = Vector2.zero;
+            if (rb != null)
+            {
+                rb.velocity = Vector2.zero;
+            }
+            return;
+        }
+
         UpdateCurrentPhase();
 
         if (rb != null)
@@ -110,7 +131,7 @@ public class HeartAI : EnemyAI
 
     private void HandleDamaged(float damage)
     {
-        if (damage <= 0f || !isActiveAndEnabled || !IsPlayerEngaged())
+        if (damage <= 0f || !isActiveAndEnabled || !IsPlayerEngaged() || IsCombatPaused())
         {
             return;
         }
@@ -132,22 +153,38 @@ public class HeartAI : EnemyAI
             yield break;
         }
 
-        float elapsed = 0f;
-        float nextRevealStep = 0f;
-        RevealDirection currentDirection = GetRandomRevealDirection();
+        float totalElapsed = 0f;
+        float segmentDuration = Mathf.Max(0.01f, revealStepInterval);
+        float revealPerStep = revealDuration > 0f
+            ? (segmentDuration * RevealSectorCount) / revealDuration
+            : 1f;
 
-        while (elapsed < revealDuration)
+        while (totalElapsed < revealDuration)
         {
-            if (elapsed >= nextRevealStep)
+            int directionIndex = GetRandomUnfinishedDirection();
+            if (directionIndex < 0)
             {
-                currentDirection = GetRandomRevealDirection();
-                nextRevealStep += Mathf.Max(0.01f, revealStepInterval);
+                break;
             }
 
-            elapsed += Time.deltaTime;
-            float progress = Mathf.Clamp01(elapsed / revealDuration);
-            ApplyVesselReveal(progress, currentDirection);
-            yield return null;
+            float currentProgress = sectorRevealProgress[directionIndex];
+            float targetProgress = Mathf.Clamp01(currentProgress + revealPerStep);
+            float currentStepDuration = Mathf.Min(segmentDuration, revealDuration - totalElapsed);
+            float segmentElapsed = 0f;
+
+            while (segmentElapsed < currentStepDuration)
+            {
+                segmentElapsed += Time.deltaTime;
+                totalElapsed += Time.deltaTime;
+
+                float t = currentStepDuration <= 0.0001f ? 1f : Mathf.Clamp01(segmentElapsed / currentStepDuration);
+                sectorRevealProgress[directionIndex] = Mathf.Lerp(currentProgress, targetProgress, t);
+                UpdateSectorMasks();
+                yield return null;
+            }
+
+            sectorRevealProgress[directionIndex] = targetProgress;
+            UpdateSectorMasks();
         }
 
         CompleteReveal();
@@ -157,65 +194,61 @@ public class HeartAI : EnemyAI
     {
         heartState = controller != null && controller.CurrentHP > 0f ? 2 : 1;
 
-        if (vesselTransform != null)
-        {
-            vesselTransform.localScale = vesselBaseLocalScale;
-            vesselTransform.localPosition = vesselBaseLocalPosition;
-        }
-
         if (vesselRenderer != null)
         {
             vesselRenderer.enabled = true;
+            vesselRenderer.maskInteraction = SpriteMaskInteraction.None;
             Color color = vesselRenderer.color;
             color.a = 1f;
             vesselRenderer.color = color;
         }
+
+        SetAllSectorMasksEnabled(false);
     }
 
     private void ApplyHiddenVessel()
     {
         if (vesselRenderer != null)
         {
-            vesselRenderer.enabled = false;
+            vesselRenderer.enabled = true;
+            vesselRenderer.maskInteraction = SpriteMaskInteraction.VisibleInsideMask;
             Color color = vesselRenderer.color;
             color.a = 1f;
             vesselRenderer.color = color;
         }
 
-        if (vesselTransform != null)
+        for (int i = 0; i < sectorRevealProgress.Length; i++)
         {
-            vesselTransform.localScale = Vector3.zero;
-            vesselTransform.localPosition = vesselBaseLocalPosition;
+            sectorRevealProgress[i] = 0f;
         }
+
+        SetAllSectorMasksEnabled(true);
+        UpdateSectorMasks();
     }
 
-    private void ApplyVesselReveal(float progress, RevealDirection direction)
+    private void UpdateSectorMasks()
     {
-        if (vesselTransform == null || vesselRenderer == null)
+        for (int i = 0; i < RevealSectorCount; i++)
         {
-            return;
+            if (sectorMaskTransforms[i] == null || sectorMasks[i] == null)
+            {
+                continue;
+            }
+
+            float progress = Mathf.Clamp01(sectorRevealProgress[i]);
+            sectorMasks[i].enabled = progress > 0.0001f;
+
+            Vector2 direction = GetSectorDirection(i);
+            float maxDistance = GetMaxDistanceAlongDirection(direction);
+            float length = Mathf.Max(0.001f, maxDistance * progress);
+            float width = Mathf.Max(0.001f, 2f * length * Mathf.Tan(RevealHalfAngle * Mathf.Deg2Rad));
+
+            sectorMaskTransforms[i].localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg);
+            // The mask sprite pivot is at its inner edge, so keeping it at the center
+            // makes each reveal sector grow outward without erasing the already-shown area.
+            sectorMaskTransforms[i].localPosition = Vector3.zero;
+            sectorMaskTransforms[i].localScale = new Vector3(length, width, 1f);
         }
-
-        vesselRenderer.enabled = progress > 0f;
-
-        Vector2 axisMask = GetAxisMask(direction);
-        Vector2 anchor = GetAnchor(direction);
-
-        float scaleX = Mathf.Lerp(1f, progress, axisMask.x);
-        float scaleY = Mathf.Lerp(1f, progress, axisMask.y);
-
-        Vector3 targetScale = new Vector3(
-            vesselBaseLocalScale.x * Mathf.Max(0.001f, scaleX),
-            vesselBaseLocalScale.y * Mathf.Max(0.001f, scaleY),
-            vesselBaseLocalScale.z);
-
-        Vector3 offset = new Vector3(
-            anchor.x * vesselBaseLocalScale.x * (1f - scaleX) * 0.5f,
-            anchor.y * vesselBaseLocalScale.y * (1f - scaleY) * 0.5f,
-            0f);
-
-        vesselTransform.localScale = targetScale;
-        vesselTransform.localPosition = vesselBaseLocalPosition + offset;
     }
 
     private void FireRandomLaunch()
@@ -311,51 +344,116 @@ public class HeartAI : EnemyAI
         }
     }
 
-    private RevealDirection GetRandomRevealDirection()
+    private int GetRandomUnfinishedDirection()
     {
-        return (RevealDirection)Random.Range(0, 8);
+        int[] candidates = new int[RevealSectorCount];
+        int count = 0;
+
+        for (int i = 0; i < RevealSectorCount; i++)
+        {
+            if (sectorRevealProgress[i] < 0.999f)
+            {
+                candidates[count] = i;
+                count++;
+            }
+        }
+
+        if (count == 0)
+        {
+            return -1;
+        }
+
+        return candidates[Random.Range(0, count)];
     }
 
-    private Vector2 GetAnchor(RevealDirection direction)
+    private void SetupVesselMask()
     {
-        switch (direction)
+        if (vesselRenderer == null || vesselTransform == null)
         {
-            case RevealDirection.Left: return Vector2.left;
-            case RevealDirection.Right: return Vector2.right;
-            case RevealDirection.Up: return Vector2.up;
-            case RevealDirection.Down: return Vector2.down;
-            case RevealDirection.UpLeft: return new Vector2(-1f, 1f);
-            case RevealDirection.UpRight: return new Vector2(1f, 1f);
-            case RevealDirection.DownLeft: return new Vector2(-1f, -1f);
-            case RevealDirection.DownRight: return new Vector2(1f, -1f);
-            default: return Vector2.zero;
+            return;
+        }
+
+        revealMaskRoot = vesselTransform.Find("RevealMasks");
+        if (revealMaskRoot == null)
+        {
+            GameObject root = new GameObject("RevealMasks");
+            revealMaskRoot = root.transform;
+            revealMaskRoot.SetParent(vesselTransform, false);
+        }
+
+        Sprite whiteSprite = GetWhiteMaskSprite();
+        vesselHalfSize = vesselRenderer.sprite != null ? vesselRenderer.sprite.bounds.extents : Vector2.one;
+
+        for (int i = 0; i < RevealSectorCount; i++)
+        {
+            Transform maskTransform = revealMaskRoot.Find("SectorMask_" + i);
+            if (maskTransform == null)
+            {
+                GameObject maskObject = new GameObject("SectorMask_" + i);
+                maskTransform = maskObject.transform;
+                maskTransform.SetParent(revealMaskRoot, false);
+            }
+
+            SpriteMask mask = maskTransform.GetComponent<SpriteMask>();
+            if (mask == null)
+            {
+                mask = maskTransform.gameObject.AddComponent<SpriteMask>();
+            }
+
+            mask.sprite = whiteSprite;
+            mask.alphaCutoff = 0f;
+            mask.isCustomRangeActive = true;
+            mask.frontSortingLayerID = vesselRenderer.sortingLayerID;
+            mask.backSortingLayerID = vesselRenderer.sortingLayerID;
+            mask.frontSortingOrder = vesselRenderer.sortingOrder + 1;
+            mask.backSortingOrder = vesselRenderer.sortingOrder - 1;
+
+            sectorMaskTransforms[i] = maskTransform;
+            sectorMasks[i] = mask;
+            sectorRevealProgress[i] = 0f;
+        }
+
+        SetAllSectorMasksEnabled(true);
+        UpdateSectorMasks();
+    }
+
+    private Vector2 GetSectorDirection(int index)
+    {
+        float angle = index * 45f;
+        float radians = angle * Mathf.Deg2Rad;
+        return new Vector2(Mathf.Cos(radians), Mathf.Sin(radians)).normalized;
+    }
+
+    private float GetMaxDistanceAlongDirection(Vector2 direction)
+    {
+        return Mathf.Abs(direction.x) * vesselHalfSize.x + Mathf.Abs(direction.y) * vesselHalfSize.y;
+    }
+
+    private void SetAllSectorMasksEnabled(bool enabled)
+    {
+        for (int i = 0; i < sectorMasks.Length; i++)
+        {
+            if (sectorMasks[i] != null)
+            {
+                sectorMasks[i].enabled = enabled;
+            }
         }
     }
 
-    private Vector2 GetAxisMask(RevealDirection direction)
+    private Sprite GetWhiteMaskSprite()
     {
-        switch (direction)
+        if (whiteMaskSprite == null)
         {
-            case RevealDirection.Left:
-            case RevealDirection.Right:
-                return new Vector2(1f, 0f);
-            case RevealDirection.Up:
-            case RevealDirection.Down:
-                return new Vector2(0f, 1f);
-            default:
-                return Vector2.one;
+            float pixelsPerUnit = Mathf.Max(1f, Texture2D.whiteTexture.width);
+            whiteMaskSprite = Sprite.Create(
+                Texture2D.whiteTexture,
+                new Rect(0f, 0f, Texture2D.whiteTexture.width, Texture2D.whiteTexture.height),
+                new Vector2(0f, 0.5f),
+                pixelsPerUnit);
         }
+
+        return whiteMaskSprite;
     }
 
-    private enum RevealDirection
-    {
-        Left,
-        Right,
-        Up,
-        Down,
-        UpLeft,
-        UpRight,
-        DownLeft,
-        DownRight
-    }
+    private static Sprite whiteMaskSprite;
 }

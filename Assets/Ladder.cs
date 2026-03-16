@@ -15,7 +15,6 @@ public class Ladder : MonoBehaviour
 
     private void OnTriggerEnter2D(Collider2D collision)
     {
-        Debug.Log("enter");
         MCController mc = collision.GetComponent<MCController>();
         if (mc != null)
         {

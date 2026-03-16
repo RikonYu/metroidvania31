@@ -39,6 +39,16 @@ public class NestAI : EnemyAI
 
     protected override void Update()
     {
+        if (IsCombatPaused())
+        {
+            moveInput = Vector2.zero;
+            if (rb != null)
+            {
+                rb.velocity = Vector2.zero;
+            }
+            return;
+        }
+
         UpdateCurrentPhase();
 
         if (rb != null)

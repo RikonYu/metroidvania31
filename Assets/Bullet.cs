@@ -112,7 +112,7 @@ public class Bullet : MonoBehaviour
     {
         if (IsEnemy)
         {
-            MCController mc = collision.gameObject.GetComponent<MCController>();
+            MCController mc = collision.gameObject.GetComponentInParent<MCController>();
             if (mc != null)
             {
                 mc.Hurt(this.Damage);
@@ -122,7 +122,7 @@ public class Bullet : MonoBehaviour
         }
         else
         {
-            EnemyController enemy = collision.gameObject.GetComponent<EnemyController>();
+            EnemyController enemy = collision.gameObject.GetComponentInParent<EnemyController>();
             if (enemy != null)
             {
                 enemy.Hurt(this.Damage);
