@@ -95,9 +95,14 @@ public class GameController : MonoBehaviour
             }
         }
 
-        if (bossLockedDoorRoom != null && AreAllBossesDefeated(bossLockedDoorRoom))
+        if (bossLockedDoorRoom != null)
         {
-            OpenBossLockedDoors();
+            EnsurePlayerInsideClosedDoors(bossLockedDoorRoom);
+
+            if (AreAllBossesDefeated(bossLockedDoorRoom))
+            {
+                OpenBossLockedDoors();
+            }
         }
     }
     public void ResetGameState()
@@ -123,6 +128,8 @@ public class GameController : MonoBehaviour
     {
         UIController.instance.ShowLose();
         ClearBullets();
+        OpenBossLockedDoors();
+        Door.OpenAllDoors();
         if (isDropped)
         {
 
@@ -133,6 +140,11 @@ public class GameController : MonoBehaviour
         }
         ResetAggro();
         mc.Respawn(isDropped);
+    }
+
+    public void ResolvePlayerDoorOverlap(Room room)
+    {
+        EnsurePlayerInsideClosedDoors(room);
     }
     private void LateUpdate()
     {
@@ -438,7 +450,13 @@ public class GameController : MonoBehaviour
         }
 
         Collider2D playerCollider = mc.GetComponent<Collider2D>();
-        if (playerCollider == null || !IsOverlappingClosedDoor(room, playerCollider))
+        if (playerCollider == null)
+        {
+            return;
+        }
+
+        List<BoxCollider2D> doorColliders = GetClosedDoorColliders(room);
+        if (doorColliders.Count == 0 || !IsOverlappingClosedDoor(playerCollider, doorColliders))
         {
             return;
         }
@@ -450,44 +468,108 @@ public class GameController : MonoBehaviour
         }
 
         Vector2 current = mc.transform.position;
-        Vector2 center = room.roomBounds.center;
-        Vector2 direction = center - current;
-        if (direction.sqrMagnitude <= 0.0001f)
-        {
-            direction = Vector2.up;
-        }
-
-        direction.Normalize();
         Vector2 extents = playerCollider.bounds.extents;
+        current = ClampPointInsideRoom(room, current, extents);
+        mc.transform.position = new Vector3(current.x, current.y, mc.transform.position.z);
+        Physics2D.SyncTransforms();
 
-        const int maxSteps = 160;
-        const float stepSize = 0.2f;
-        for (int i = 0; i < maxSteps; i++)
+        const int maxIterations = 24;
+        const float separationPadding = 0.02f;
+        for (int iteration = 0; iteration < maxIterations; iteration++)
         {
-            current += direction * stepSize;
-            current = ClampPointInsideRoom(room, current, extents);
-            mc.transform.position = new Vector3(current.x, current.y, mc.transform.position.z);
-            Physics2D.SyncTransforms();
-
-            if (!IsOverlappingClosedDoor(room, playerCollider))
+            if (!IsOverlappingClosedDoor(playerCollider, doorColliders))
             {
                 return;
             }
+
+            Vector2 correction = Vector2.zero;
+            int overlapCount = 0;
+
+            for (int i = 0; i < doorColliders.Count; i++)
+            {
+                BoxCollider2D doorCollider = doorColliders[i];
+                if (doorCollider == null || !doorCollider.enabled)
+                {
+                    continue;
+                }
+
+                ColliderDistance2D distance = playerCollider.Distance(doorCollider);
+                if (!distance.isOverlapped)
+                {
+                    continue;
+                }
+
+                Vector2 normal = distance.normal;
+                if (normal.sqrMagnitude <= 0.0001f)
+                {
+                    normal = ((Vector2)mc.transform.position - (Vector2)room.roomBounds.center).normalized;
+                    if (normal.sqrMagnitude <= 0.0001f)
+                    {
+                        normal = Vector2.up;
+                    }
+                }
+
+                correction += -normal.normalized * (Mathf.Abs(distance.distance) + separationPadding);
+                overlapCount++;
+            }
+
+            if (overlapCount <= 0)
+            {
+                return;
+            }
+
+            correction /= overlapCount;
+            if (correction.sqrMagnitude <= 0.000001f)
+            {
+                correction = ((Vector2)room.roomBounds.center - (Vector2)mc.transform.position).normalized * 0.05f;
+            }
+
+            current = (Vector2)mc.transform.position + correction;
+            current = ClampPointInsideRoom(room, current, extents);
+            mc.transform.position = new Vector3(current.x, current.y, mc.transform.position.z);
+            Physics2D.SyncTransforms();
         }
 
-        Vector2 fallback = ClampPointInsideRoom(room, center, extents);
-        mc.transform.position = new Vector3(fallback.x, fallback.y, mc.transform.position.z);
-        Physics2D.SyncTransforms();
+        if (TryFindSafePointInRoom(room, playerCollider, doorColliders, extents, out Vector2 safePoint))
+        {
+            mc.transform.position = new Vector3(safePoint.x, safePoint.y, mc.transform.position.z);
+            Physics2D.SyncTransforms();
+        }
     }
 
-    private bool IsOverlappingClosedDoor(Room room, Collider2D playerCollider)
+    private bool IsOverlappingClosedDoor(Collider2D playerCollider, List<BoxCollider2D> doorColliders)
     {
-        if (room == null || playerCollider == null)
+        if (playerCollider == null || doorColliders == null)
         {
             return false;
         }
 
-        Bounds playerBounds = playerCollider.bounds;
+        for (int i = 0; i < doorColliders.Count; i++)
+        {
+            BoxCollider2D doorCollider = doorColliders[i];
+            if (doorCollider == null || !doorCollider.enabled || doorCollider.isTrigger)
+            {
+                continue;
+            }
+
+            ColliderDistance2D distance = playerCollider.Distance(doorCollider);
+            if (distance.isOverlapped)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private List<BoxCollider2D> GetClosedDoorColliders(Room room)
+    {
+        List<BoxCollider2D> colliders = new List<BoxCollider2D>();
+        if (room == null)
+        {
+            return colliders;
+        }
+
         Door[] doors = room.GetComponentsInChildren<Door>(true);
         for (int i = 0; i < doors.Length; i++)
         {
@@ -498,18 +580,69 @@ public class GameController : MonoBehaviour
             }
 
             BoxCollider2D doorCollider = door.GetComponent<BoxCollider2D>();
-            if (doorCollider == null || !doorCollider.enabled || doorCollider.isTrigger)
+            if (doorCollider != null && doorCollider.enabled && !doorCollider.isTrigger)
             {
-                continue;
+                colliders.Add(doorCollider);
             }
+        }
 
-            if (doorCollider.bounds.Intersects(playerBounds))
+        return colliders;
+    }
+
+    private bool TryFindSafePointInRoom(
+        Room room,
+        Collider2D playerCollider,
+        List<BoxCollider2D> doorColliders,
+        Vector2 playerExtents,
+        out Vector2 safePoint)
+    {
+        safePoint = room != null ? (Vector2)room.roomBounds.center : Vector2.zero;
+        if (room == null || playerCollider == null)
+        {
+            return false;
+        }
+
+        Vector2 center = ClampPointInsideRoom(room, room.roomBounds.center, playerExtents);
+        if (IsCandidatePointSafe(room, playerCollider, doorColliders, playerExtents, center))
+        {
+            safePoint = center;
+            return true;
+        }
+
+        float maxRadius = Mathf.Max(1f, Mathf.Max(room.roomBounds.extents.x, room.roomBounds.extents.y));
+        const float radiusStep = 0.35f;
+        const int angleSamples = 20;
+
+        for (float radius = radiusStep; radius <= maxRadius; radius += radiusStep)
+        {
+            for (int i = 0; i < angleSamples; i++)
             {
-                return true;
+                float angle = (360f / angleSamples) * i;
+                Vector2 offset = new Vector2(Mathf.Cos(angle * Mathf.Deg2Rad), Mathf.Sin(angle * Mathf.Deg2Rad)) * radius;
+                Vector2 candidate = center + offset;
+
+                if (IsCandidatePointSafe(room, playerCollider, doorColliders, playerExtents, candidate))
+                {
+                    safePoint = ClampPointInsideRoom(room, candidate, playerExtents);
+                    return true;
+                }
             }
         }
 
         return false;
+    }
+
+    private bool IsCandidatePointSafe(
+        Room room,
+        Collider2D playerCollider,
+        List<BoxCollider2D> doorColliders,
+        Vector2 playerExtents,
+        Vector2 candidate)
+    {
+        Vector2 clamped = ClampPointInsideRoom(room, candidate, playerExtents);
+        mc.transform.position = new Vector3(clamped.x, clamped.y, mc.transform.position.z);
+        Physics2D.SyncTransforms();
+        return !IsOverlappingClosedDoor(playerCollider, doorColliders);
     }
 
     private Vector2 ClampPointInsideRoom(Room room, Vector2 point, Vector2 playerExtents)

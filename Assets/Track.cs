@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class Track : MonoBehaviour
@@ -17,10 +15,12 @@ public class Track : MonoBehaviour
 
         if (spriteRenderer != null)
         {
-            spriteRenderer.flipX = IsLeft;
+            spriteRenderer.flipX = false;
         }
+        animator.SetBool("isleft", IsLeft) ;
 
         UpdateAnimatorSpeed();
+
     }
 
     void Update()
@@ -31,7 +31,7 @@ public class Track : MonoBehaviour
     public Vector2 GetVelocity()
     {
         float direction = IsLeft ? -1f : 1f;
-        return new Vector2(direction * MoveSpeed, 0f);
+        return new Vector2(direction * Mathf.Abs(MoveSpeed), 0f);
     }
 
     private void UpdateAnimatorSpeed()
@@ -41,7 +41,8 @@ public class Track : MonoBehaviour
             return;
         }
 
-        float signedSpeed = IsLeft ? -MoveSpeed : MoveSpeed;
+        float signedSpeed = IsLeft ? -Mathf.Abs(MoveSpeed) : Mathf.Abs(MoveSpeed);
         animator.SetFloat("Speed", signedSpeed / 3f);
+
     }
 }

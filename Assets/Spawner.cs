@@ -18,6 +18,14 @@ public class Spawner : MonoBehaviour
     private int currentWaveIndex = -1;
     private bool initialized;
     private bool completed;
+    private bool doorsLocked;
+    private Room ownerRoom;
+    private readonly List<Door> doorsClosedBySpawner = new List<Door>();
+
+    private void Awake()
+    {
+        ownerRoom = GetComponentInParent<Room>();
+    }
 
     private void OnEnable()
     {
@@ -33,10 +41,20 @@ public class Spawner : MonoBehaviour
             SetRewardsActive(false);
             ActivateNextWave();
         }
+
+        if (!completed && !doorsLocked && ShouldLockDoorsNow())
+        {
+            LockRoomDoors();
+        }
     }
 
     private void Update()
     {
+        if (!completed && !doorsLocked && ShouldLockDoorsNow())
+        {
+            LockRoomDoors();
+        }
+
         if (completed || currentWaveIndex < 0 || currentWaveIndex >= waves.Count)
         {
             return;
@@ -113,6 +131,7 @@ public class Spawner : MonoBehaviour
     private void CompleteSpawner()
     {
         completed = true;
+        UnlockRoomDoors();
         SetRewardsActive(true);
         Destroy(gameObject);
     }
@@ -158,5 +177,81 @@ public class Spawner : MonoBehaviour
                 reward.SetActive(active);
             }
         }
+    }
+
+    private bool ShouldLockDoorsNow()
+    {
+        if (ownerRoom == null || GameController.instance == null || GameController.instance.mc == null)
+        {
+            return false;
+        }
+
+        return GameController.instance.ActiveRoom == ownerRoom;
+    }
+
+    private void LockRoomDoors()
+    {
+        if (doorsLocked || ownerRoom == null)
+        {
+            return;
+        }
+
+        doorsLocked = true;
+        doorsClosedBySpawner.Clear();
+
+        Door[] doors = ownerRoom.GetComponentsInChildren<Door>(true);
+        for (int i = 0; i < doors.Length; i++)
+        {
+            Door door = doors[i];
+            if (door == null)
+            {
+                continue;
+            }
+
+            bool wasOpen = IsDoorOpen(door);
+            door.Close();
+            if (wasOpen)
+            {
+                doorsClosedBySpawner.Add(door);
+            }
+        }
+
+        GameController.instance.ResolvePlayerDoorOverlap(ownerRoom);
+    }
+
+    private void UnlockRoomDoors()
+    {
+        if (!doorsLocked)
+        {
+            return;
+        }
+
+        for (int i = 0; i < doorsClosedBySpawner.Count; i++)
+        {
+            Door door = doorsClosedBySpawner[i];
+            if (door != null)
+            {
+                door.Open();
+            }
+        }
+
+        doorsClosedBySpawner.Clear();
+        doorsLocked = false;
+    }
+
+    private bool IsDoorOpen(Door door)
+    {
+        if (door == null)
+        {
+            return false;
+        }
+
+        BoxCollider2D doorCollider = door.GetComponent<BoxCollider2D>();
+        if (doorCollider == null)
+        {
+            return true;
+        }
+
+        return !doorCollider.enabled;
     }
 }

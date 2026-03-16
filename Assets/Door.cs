@@ -4,7 +4,7 @@ public class Door : MonoBehaviour
 {
     public Sprite spr1; // opened
     public Sprite spr2; // closed
-    public bool startOpened;
+    public bool startOpened = true;
 
     private SpriteRenderer spriteRenderer;
     private BoxCollider2D obstacleCollider;
@@ -49,6 +49,18 @@ public class Door : MonoBehaviour
         if (obstacleCollider != null)
         {
             obstacleCollider.enabled = !isOpen;
+        }
+    }
+
+    public static void OpenAllDoors()
+    {
+        Door[] allDoors = FindObjectsOfType<Door>(true);
+        for (int i = 0; i < allDoors.Length; i++)
+        {
+            if (allDoors[i] != null)
+            {
+                allDoors[i].Open();
+            }
         }
     }
 }
