@@ -28,12 +28,19 @@ public class GameController : MonoBehaviour
     [SerializeField] private Transform bulletContainer;
     [SerializeField] private float bossIntroDuration = 1.1f;
     [SerializeField] private float bossIntroCameraDuration = 2.2f;
+    [SerializeField] private float deathFadeOutDuration = 0.6f;
+    [SerializeField] private float deathFadeInDuration = 0.7f;
+    [SerializeField] private float droppedRespawnDelay = 1.2f;
 
     List<GameObject> AcquiredBullets;
     private Coroutine bossIntroCoroutine;
     private Room bossIntroRoom;
     private bool bossIntroCameraOverrideActive;
     private Vector3 bossIntroCameraOverridePosition;
+    private bool deathCameraOverrideActive;
+    private Vector3 deathCameraOverridePosition;
+    private Coroutine deathRoutine;
+    private Coroutine campTeleportRoutine;
     private Room bossLockedDoorRoom;
     private readonly List<Door> bossClosedDoors = new List<Door>();
 
@@ -113,12 +120,7 @@ public class GameController : MonoBehaviour
 
         foreach (var i in AllEnemies)
         {
-            if (i == null || i.IsBoss)
-            {
-                continue;
-            }
-
-            if (spawnerManagedEnemies.Contains(i.gameObject))
+            if (ShouldSkipEnemyForGlobalReset(i, spawnerManagedEnemies))
             {
                 continue;
             }
@@ -128,6 +130,33 @@ public class GameController : MonoBehaviour
         }
 
         mc.CurrentHealth = mc.MaxHealth;
+    }
+
+    private bool ShouldSkipEnemyForGlobalReset(EnemyController enemy, HashSet<GameObject> spawnerManagedEnemies)
+    {
+        if (enemy == null)
+        {
+            return true;
+        }
+
+        if (enemy.IsBoss)
+        {
+            return true;
+        }
+
+        if (spawnerManagedEnemies != null && spawnerManagedEnemies.Contains(enemy.gameObject))
+        {
+            return true;
+        }
+
+        string enemyTag = enemy.gameObject.tag;
+        if (string.Equals(enemyTag, "elite", System.StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        string enemyName = enemy.gameObject.name;
+        return enemyName.IndexOf("elite", System.StringComparison.OrdinalIgnoreCase) >= 0;
     }
     public void ResetAggro()
     {
@@ -140,8 +169,157 @@ public class GameController : MonoBehaviour
     }
     public void Die(bool isDropped)
     {
-        UIController.instance.ShowLose();
-        ClearBullets();
+        if (deathRoutine != null || campTeleportRoutine != null)
+        {
+            return;
+        }
+
+        deathRoutine = StartCoroutine(DeathRoutine(isDropped));
+    }
+
+    private IEnumerator DeathRoutine(bool isDropped)
+    {
+        UIController.instance?.ShowLose();
+        UIController.instance?.SetBlackBgAlpha(0f);
+        StopBossIntroSequence();
+        ClearAllProjectiles();
+
+        if (mc != null)
+        {
+            mc.SetControlLocked(true);
+            Rigidbody2D playerRb = mc.GetComponent<Rigidbody2D>();
+            if (playerRb != null)
+            {
+                playerRb.velocity = Vector2.zero;
+            }
+        }
+
+        SetDeathCameraOverride(mainCam != null ? mainCam.transform.position : Vector3.zero);
+
+        if (isDropped)
+        {
+            float waitTime = Mathf.Max(0f, droppedRespawnDelay);
+            if (waitTime > 0f)
+            {
+                yield return new WaitForSeconds(waitTime);
+            }
+
+            ClearAllProjectiles();
+            ExecuteDeathRespawn(isDropped);
+            SnapCameraToPlayer();
+            yield return null;
+        }
+        else
+        {
+            yield return StartCoroutine(FadeBlack(0f, 1f, deathFadeOutDuration));
+            ClearAllProjectiles();
+            ExecuteDeathRespawn(isDropped);
+            SnapCameraToPlayer();
+            yield return StartCoroutine(FadeBlack(1f, 0f, deathFadeInDuration));
+        }
+
+        ClearDeathCameraOverride();
+        if (mc != null)
+        {
+            mc.SetControlLocked(false);
+        }
+
+        deathRoutine = null;
+    }
+
+    public bool TryTeleportToCampFromMinimap(Camp targetCamp)
+    {
+        if (targetCamp == null || campTeleportRoutine != null || deathRoutine != null)
+        {
+            return false;
+        }
+
+        campTeleportRoutine = StartCoroutine(CampTeleportRoutine(targetCamp));
+        return true;
+    }
+
+    private IEnumerator CampTeleportRoutine(Camp targetCamp)
+    {
+        UIController.instance?.ShowLose();
+        StopBossIntroSequence();
+        ClearAllProjectiles();
+
+        if (mc != null)
+        {
+            mc.SetControlLocked(true);
+            Rigidbody2D rb = mc.GetComponent<Rigidbody2D>();
+            if (rb != null)
+            {
+                rb.velocity = Vector2.zero;
+            }
+        }
+
+        SetDeathCameraOverride(mainCam != null ? mainCam.transform.position : Vector3.zero);
+        yield return StartCoroutine(FadeBlack(0f, 1f, deathFadeOutDuration));
+        ClearAllProjectiles();
+
+        CleanupUnownedEnemies();
+
+        Room targetRoom = targetCamp.GetComponentInParent<Room>(true);
+        if (targetRoom != null && targetRoom != ActiveRoom)
+        {
+            ActivateRoom(targetRoom);
+        }
+
+        if (mc != null)
+        {
+            Vector3 destination = GetCampRespawnPosition(targetCamp);
+            mc.transform.position = destination;
+            LastCamp = targetCamp;
+
+            ResetGameState();
+            ResetAggro();
+
+            mc.CurrentHealth = mc.MaxHealth;
+            mc.CurrentEnergy = mc.MaxEnergy;
+            UIController.instance?.SetHP(mc.CurrentHealth, mc.MaxHealth);
+            UIController.instance?.SetEnergy(mc.CurrentEnergy, mc.MaxEnergy);
+        }
+
+        SnapCameraToPlayer();
+        yield return StartCoroutine(FadeBlack(1f, 0f, deathFadeInDuration));
+
+        ClearDeathCameraOverride();
+        if (mc != null)
+        {
+            mc.SetControlLocked(false);
+        }
+
+        campTeleportRoutine = null;
+    }
+
+    private Vector3 GetCampRespawnPosition(Camp camp)
+    {
+        if (camp == null || mc == null)
+        {
+            return mc != null ? mc.transform.position : Vector3.zero;
+        }
+
+        Vector3 basePos = camp.transform.position;
+        float topY = basePos.y;
+        Collider2D campCollider = camp.GetComponent<Collider2D>();
+        if (campCollider != null)
+        {
+            topY = campCollider.bounds.max.y;
+        }
+
+        float playerHalfHeight = 0.5f;
+        Collider2D playerCollider = mc.GetComponent<Collider2D>();
+        if (playerCollider != null)
+        {
+            playerHalfHeight = playerCollider.bounds.extents.y;
+        }
+
+        return new Vector3(basePos.x, topY + playerHalfHeight + 0.01f, mc.transform.position.z);
+    }
+
+    private void ExecuteDeathRespawn(bool isDropped)
+    {
         CleanupUnownedEnemies();
         Room deathRoom = ActiveRoom;
         bool diedInBossRoom = !isDropped && deathRoom != null && deathRoom.IsBossRoom;
@@ -153,16 +331,17 @@ public class GameController : MonoBehaviour
 
         OpenBossLockedDoors();
         Door.OpenAllDoors();
-        if (isDropped)
-        {
-
-        }
-        else
+        if (!isDropped)
         {
             ResetGameState();
         }
+
         ResetAggro();
-        mc.Respawn(isDropped);
+        if (mc != null)
+        {
+            mc.Respawn(isDropped);
+            mc.SetControlLocked(true);
+        }
     }
 
     private void CleanupUnownedEnemies()
@@ -176,7 +355,7 @@ public class GameController : MonoBehaviour
                 continue;
             }
 
-            Room ownerRoom = enemy.GetComponentInParent<Room>();
+            Room ownerRoom = enemy.GetComponentInParent<Room>(true);
             if (ownerRoom != null)
             {
                 continue;
@@ -188,6 +367,78 @@ public class GameController : MonoBehaviour
         }
     }
 
+    private IEnumerator FadeBlack(float from, float to, float duration)
+    {
+        UIController ui = UIController.instance;
+        if (ui == null)
+        {
+            if (duration > 0f)
+            {
+                yield return new WaitForSeconds(duration);
+            }
+            yield break;
+        }
+
+        ui.SetBlackBgAlpha(from);
+        if (duration <= 0f)
+        {
+            ui.SetBlackBgAlpha(to);
+            yield break;
+        }
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            ui.SetBlackBgAlpha(Mathf.Lerp(from, to, t));
+            yield return null;
+        }
+
+        ui.SetBlackBgAlpha(to);
+    }
+
+    private void SetDeathCameraOverride(Vector3 worldPosition)
+    {
+        deathCameraOverridePosition = worldPosition;
+        if (mainCam != null)
+        {
+            deathCameraOverridePosition.z = mainCam.transform.position.z;
+        }
+
+        deathCameraOverrideActive = true;
+    }
+
+    private void ClearDeathCameraOverride()
+    {
+        deathCameraOverrideActive = false;
+    }
+
+    private void SnapCameraToPlayer()
+    {
+        if (mc == null || mainCam == null)
+        {
+            return;
+        }
+
+        Room clampRoom = ActiveRoom;
+        if (RoomBounds != null)
+        {
+            foreach (KeyValuePair<Room, Rect> pair in RoomBounds)
+            {
+                if (pair.Key != null && pair.Value.Contains(mc.transform.position))
+                {
+                    clampRoom = pair.Key;
+                    break;
+                }
+            }
+        }
+
+        Vector3 target = GetClampedCameraPosition(clampRoom, mc.transform.position);
+        SetDeathCameraOverride(target);
+        mainCam.transform.position = target;
+    }
+
     public void ResolvePlayerDoorOverlap(Room room)
     {
         EnsurePlayerInsideClosedDoors(room);
@@ -195,6 +446,12 @@ public class GameController : MonoBehaviour
     private void LateUpdate()
     {
         if (ActiveRoom == null || mc == null || mainCam == null) return;
+
+        if (deathCameraOverrideActive)
+        {
+            mainCam.transform.position = deathCameraOverridePosition;
+            return;
+        }
 
         if (bossIntroCameraOverrideActive)
         {
@@ -255,6 +512,43 @@ public class GameController : MonoBehaviour
         {
             if(bullet!=null)
             ReturnBullet(bullet);
+        }
+    }
+
+    public void ClearAllProjectiles()
+    {
+        ClearBullets();
+
+        Bullet[] allBullets = FindObjectsOfType<Bullet>(true);
+        for (int i = 0; i < allBullets.Length; i++)
+        {
+            Bullet bullet = allBullets[i];
+            if (bullet == null || !bullet.gameObject.activeSelf)
+            {
+                continue;
+            }
+
+            if (activeBullets.Contains(bullet))
+            {
+                ReturnBullet(bullet);
+                continue;
+            }
+
+            string key = bullet.PoolKey;
+            if (!string.IsNullOrEmpty(key))
+            {
+                if (!bulletPools.ContainsKey(key))
+                {
+                    bulletPools[key] = new Queue<Bullet>();
+                }
+
+                bullet.gameObject.SetActive(false);
+                bulletPools[key].Enqueue(bullet);
+            }
+            else
+            {
+                bullet.gameObject.SetActive(false);
+            }
         }
     }
 

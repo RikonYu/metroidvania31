@@ -23,6 +23,7 @@ public class UIController : MonoBehaviour
     private TMP_Text[] bulletTexts;
 
     public Image blackbg;
+    public Sprite SaveIcon, ChosenIcon;
 
     // Start is called before the first frame update
     private void Awake()
@@ -53,6 +54,7 @@ public class UIController : MonoBehaviour
         }
 
         UpdateWeaponIcons(new bool[4], -1);
+        SetBlackBgAlpha(0f);
     }
 
 
@@ -116,14 +118,33 @@ public class UIController : MonoBehaviour
 
     public void ShowMinimap()
     {
-        MinimapBG.SetActive(true);
-        Minimap.instance.gridParent.gameObject.SetActive(true);
+        if (MinimapBG != null)
+        {
+            MinimapBG.SetActive(true);
+        }
+
+        if (Minimap.instance != null && Minimap.instance.gridParent != null)
+        {
+            Minimap.instance.gridParent.gameObject.SetActive(true);
+            Minimap.instance.OnMinimapShown();
+        }
     }
 
     public void HideMinimap()
     {
-        MinimapBG.SetActive(false);
-        Minimap.instance.gridParent.gameObject.SetActive(false);
+        if (MinimapBG != null)
+        {
+            MinimapBG.SetActive(false);
+        }
+
+        if (Minimap.instance != null)
+        {
+            Minimap.instance.OnMinimapHidden();
+            if (Minimap.instance.gridParent != null)
+            {
+                Minimap.instance.gridParent.gameObject.SetActive(false);
+            }
+        }
     }
 
     public void UpdateWeaponIcons(bool[] unlockedWeapons, int equippedIndex)
@@ -230,6 +251,33 @@ public class UIController : MonoBehaviour
 
         float clamped = Mathf.Clamp01(scale);
         BossHPParent.transform.localScale = new Vector3(clamped, 1f, 1f);
+    }
+
+    public void SetBlackBgAlpha(float alpha)
+    {
+        if (blackbg == null)
+        {
+            return;
+        }
+
+        if (!blackbg.gameObject.activeSelf)
+        {
+            blackbg.gameObject.SetActive(true);
+        }
+
+        Color color = blackbg.color;
+        color.a = Mathf.Clamp01(alpha);
+        blackbg.color = color;
+    }
+
+    public float GetBlackBgAlpha()
+    {
+        if (blackbg == null)
+        {
+            return 0f;
+        }
+
+        return blackbg.color.a;
     }
 
 }

@@ -27,6 +27,7 @@ public class ArmAIEditor : Editor
         EditorGUILayout.PropertyField(serializedObject.FindProperty("restDuration"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("armMoveSpeed"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("fireInterval"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("armStartShakeAmplitude"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("engageOnlyInActiveRoom"));
 
         EditorGUILayout.Space();

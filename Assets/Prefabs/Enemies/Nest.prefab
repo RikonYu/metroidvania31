@@ -108,6 +108,7 @@ MonoBehaviour:
   Waypoints: {fileID: 1558084376845915473}
   wm: {fileID: 0}
   IsBoss: 0
+  CombatEnabled: 1
   flashDuration: 0.15
   flashColor: {r: 1, g: 1, b: 1, a: 1}
 --- !u!114 &8148909343780007871
@@ -142,8 +143,8 @@ MonoBehaviour:
   searchWaitTime: 2
   direction: 6
   insectPrefab: {fileID: 163069815059962610, guid: 67723c7cc803e1147a3a46ec3578f313, type: 3}
-  spawnCooldown: 3
-  spawnCount: 3
+  spawnCooldown: 4.5
+  spawnCount: 2
   intraBurstDelay: 0.08
   maxSignedMoveAngle: 35
 --- !u!1 &163069816326980511

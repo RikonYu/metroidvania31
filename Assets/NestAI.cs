@@ -16,6 +16,9 @@ public class NestAI : EnemyAI
     private SpriteRenderer spriteRenderer;
     private Transform fireSpot;
     private bool isBursting;
+    private float nextBurstTime;
+    private bool waitForFreshSight = true;
+    private Coroutine burstRoutine;
 
     protected override void Start()
     {
@@ -35,6 +38,8 @@ public class NestAI : EnemyAI
 
         fireSpot = transform.Find("firespot");
         ApplyDirectionVisuals();
+        nextBurstTime = Time.time + GetSpawnCooldown();
+        waitForFreshSight = true;
     }
 
     protected override void Update()
@@ -65,13 +70,20 @@ public class NestAI : EnemyAI
 
         if (!CanSeePlayerInFacingView())
         {
+            waitForFreshSight = true;
             return;
         }
 
-        if (Time.time >= lastAttackTime + spawnCooldown)
+        if (waitForFreshSight)
         {
-            lastAttackTime = Time.time;
-            StartCoroutine(SpawnBurstRoutine());
+            waitForFreshSight = false;
+            nextBurstTime = Time.time + GetSpawnCooldown();
+            return;
+        }
+
+        if (Time.time >= nextBurstTime)
+        {
+            burstRoutine = StartCoroutine(SpawnBurstRoutine());
         }
     }
 
@@ -152,6 +164,31 @@ public class NestAI : EnemyAI
         }
 
         isBursting = false;
+        nextBurstTime = Time.time + GetSpawnCooldown();
+        burstRoutine = null;
+    }
+
+    private float GetSpawnCooldown()
+    {
+        float cooldown = spawnCooldown;
+        if (cooldown <= 0f)
+        {
+            cooldown = attackCooldown;
+        }
+
+        return Mathf.Max(0.01f, cooldown);
+    }
+
+    private void OnDisable()
+    {
+        if (burstRoutine != null)
+        {
+            StopCoroutine(burstRoutine);
+            burstRoutine = null;
+        }
+
+        isBursting = false;
+        waitForFreshSight = true;
     }
 
     private float GetSignedAngleForIndex(int index, int count, float angleExtent)

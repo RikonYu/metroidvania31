@@ -15,6 +15,7 @@ public class ArmAI : EnemyAI, IEncounterResettable
     public float armMoveSpeed = 14f;
     public float fireInterval = 0.5f; // k seconds
     public bool engageOnlyInActiveRoom = true;
+    public float armStartShakeAmplitude = 0.1f;
 
     [Header("Room Local Anchors")]
     public Vector2 leftAnchor = new Vector2(8.3f,5.5f);
@@ -40,8 +41,10 @@ public class ArmAI : EnemyAI, IEncounterResettable
         public Collider2D[] colliders;
         public Sprite[] defaultSprites;
         public bool[] defaultRendererEnabled;
+        public int[] defaultSortingOrders;
         public bool[] defaultColliderEnabled;
         public Vector3 centerPos;
+        public bool lastVisibleState;
     }
 
     protected override void Start()
@@ -488,6 +491,11 @@ public class ArmAI : EnemyAI, IEncounterResettable
             return;
         }
 
+        if (visible && !rig.lastVisibleState && armStartShakeAmplitude > 0f && Shaker.instance != null)
+        {
+            Shaker.instance.Shake(armStartShakeAmplitude);
+        }
+
         if (rig.renderers != null)
         {
             for (int i = 0; i < rig.renderers.Length; i++)
@@ -501,10 +509,14 @@ public class ArmAI : EnemyAI, IEncounterResettable
                 bool defaultEnabled = rig.defaultRendererEnabled != null && i < rig.defaultRendererEnabled.Length
                     ? rig.defaultRendererEnabled[i]
                     : true;
+                int defaultSortingOrder = rig.defaultSortingOrders != null && i < rig.defaultSortingOrders.Length
+                    ? rig.defaultSortingOrders[i]
+                    : renderer.sortingOrder;
 
                 if (visible)
                 {
                     renderer.enabled = defaultEnabled;
+                    renderer.sortingOrder = defaultSortingOrder;
                     if (rig.defaultSprites != null && i < rig.defaultSprites.Length && rig.defaultSprites[i] != null)
                     {
                         renderer.sprite = rig.defaultSprites[i];
@@ -512,6 +524,7 @@ public class ArmAI : EnemyAI, IEncounterResettable
                 }
                 else
                 {
+                    renderer.sortingOrder = defaultSortingOrder - 1;
                     if (defaultEnabled && IAS != null)
                     {
                         renderer.enabled = true;
@@ -541,6 +554,8 @@ public class ArmAI : EnemyAI, IEncounterResettable
                 collider.enabled = visible ? defaultEnabled : false;
             }
         }
+
+        rig.lastVisibleState = visible;
     }
 
     private void SetArmLocalPosition(ArmRig rig, Vector2 localPosition)
@@ -606,6 +621,7 @@ public class ArmAI : EnemyAI, IEncounterResettable
         rig.colliders = arm.GetComponentsInChildren<Collider2D>(true);
         rig.defaultSprites = new Sprite[rig.renderers.Length];
         rig.defaultRendererEnabled = new bool[rig.renderers.Length];
+        rig.defaultSortingOrders = new int[rig.renderers.Length];
         for (int i = 0; i < rig.renderers.Length; i++)
         {
             if (rig.renderers[i] == null)
@@ -615,6 +631,7 @@ public class ArmAI : EnemyAI, IEncounterResettable
 
             rig.defaultSprites[i] = rig.renderers[i].sprite;
             rig.defaultRendererEnabled[i] = rig.renderers[i].enabled;
+            rig.defaultSortingOrders[i] = rig.renderers[i].sortingOrder;
         }
 
         rig.defaultColliderEnabled = new bool[rig.colliders.Length];
@@ -635,6 +652,7 @@ public class ArmAI : EnemyAI, IEncounterResettable
             relay.SetOwner(controller);
         }
         rig.centerPos = arm.localPosition;
+        rig.lastVisibleState = false;
         return rig;
     }
 

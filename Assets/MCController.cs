@@ -405,6 +405,22 @@ public class MCController : MonoBehaviour
             return;
         }
 
+        if (IsMinimapOpen())
+        {
+            horizontalInput = 0f;
+            isCharging = false;
+            handup.SetActive(false);
+            handdown.SetActive(true);
+
+            if (Input.GetKeyDown(KeyCode.M))
+            {
+                UIController.instance.ToggleMinimap();
+            }
+
+            UpdateAnimationParameters();
+            return;
+        }
+
         if (isSliding)
         {
             handup.SetActive(false);
@@ -552,6 +568,18 @@ public class MCController : MonoBehaviour
                 rb.velocity = Vector2.zero;
                 rb.gravityScale = 0f;
             }
+            UpdateAnimationParameters();
+            return;
+        }
+
+        if (IsMinimapOpen())
+        {
+            if (rb != null)
+            {
+                rb.velocity = Vector2.zero;
+                rb.gravityScale = 0f;
+            }
+
             UpdateAnimationParameters();
             return;
         }
@@ -1235,5 +1263,12 @@ public class MCController : MonoBehaviour
         {
             rb.gravityScale = lockedGravityScale;
         }
+    }
+
+    private bool IsMinimapOpen()
+    {
+        return UIController.instance != null
+            && UIController.instance.MinimapBG != null
+            && UIController.instance.MinimapBG.activeSelf;
     }
 }

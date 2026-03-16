@@ -67,6 +67,7 @@ public class EnemyController : MonoBehaviour
         // 恢复正常外观和状态
         if (spriteRenderer != null) spriteRenderer.color = originalColor;
         UpdateDamageEffect();
+        RefreshBossHpUI();
     }
 
     // Start is called before the first frame update
@@ -107,6 +108,7 @@ public class EnemyController : MonoBehaviour
     protected virtual void Die()
     {
         IsDead = true;
+        RefreshBossHpUI();
 
         // 死亡时停止粒子发射
         if (damageParticles != null) damageParticles.Stop();
@@ -126,6 +128,7 @@ public class EnemyController : MonoBehaviour
     public void Hurt(float dmg)
     {
         CurrentHP -= dmg;
+        RefreshBossHpUI();
         Damaged?.Invoke(dmg);
 
         // 1. 触发或重置闪白光效果
@@ -140,6 +143,22 @@ public class EnemyController : MonoBehaviour
 
         // 2. 检查是否达到破损血线（小于一半）
         UpdateDamageEffect();
+    }
+
+    private void RefreshBossHpUI()
+    {
+        if (!IsBoss || UIController.instance == null || GameController.instance == null)
+        {
+            return;
+        }
+
+        Room ownerRoom = GetComponentInParent<Room>();
+        if (ownerRoom == null || GameController.instance.ActiveRoom != ownerRoom)
+        {
+            return;
+        }
+
+        UIController.instance.SetBossHP(CurrentHP, MaxHP);
     }
 
     public void Freeze(float duration)

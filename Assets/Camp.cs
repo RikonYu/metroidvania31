@@ -15,6 +15,8 @@ public class Camp : Interactable
     [Tooltip("向下探测地面的最大距离")]
     [SerializeField] private float snapDistance = 10f;
 
+    public bool IsVisited { get; private set; }
+
     Animator anim;
     void Start()
     {
@@ -22,6 +24,10 @@ public class Camp : Interactable
         if (GameController.instance != null)
         {
             GameController.instance.Camps.Add(this);
+            if (GameController.instance.LastCamp == this)
+            {
+                IsVisited = true;
+            }
         }
 
         Utils.SnapToGround(gameObject, snapDistance, groundLayer);
@@ -48,6 +54,7 @@ public class Camp : Interactable
     public override void Interact()
     {
         GameController.instance.LastCamp = this;
+        IsVisited = true;
         anim.SetTrigger("save");
         infoObject.SetActive(false);
     }

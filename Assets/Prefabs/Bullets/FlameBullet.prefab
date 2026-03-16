@@ -143,5 +143,5 @@ MonoBehaviour:
   CoolDown: 0.05
   MaxBounceCount: 0
   MinSpeedThreshold: 1
-  EnergyCost: 1
+  EnergyCost: 2
   PoolKey: 

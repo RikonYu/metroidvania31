@@ -24,6 +24,7 @@ public class InsectAI : EnemyAI
     private bool defaultIsFlying;
     private bool isPhasing;
     private bool phaseTouchedObstacle;
+    private bool phaseEnteredObstacle;
     private bool hasHitPlayer;
     private int arcDirection = 1;
     private float phaseTimer;
@@ -180,9 +181,12 @@ public class InsectAI : EnemyAI
     {
         Move(moveAngle);
 
-        if (bodyCollider != null && !bodyCollider.isTrigger && IsOverlappingObstacle())
+        if (bodyCollider != null && !bodyCollider.isTrigger)
         {
-            StartPhasing();
+            if (IsOverlappingObstacle() || HasObstacleAhead(GetPhaseProbeDistance()))
+            {
+                StartPhasing();
+            }
         }
     }
 
@@ -362,13 +366,32 @@ public class InsectAI : EnemyAI
 
         phaseTimer -= Time.deltaTime;
 
-        if (IsOverlappingObstacle())
+        bool overlappingObstacle = IsOverlappingObstacle();
+        if (overlappingObstacle)
         {
             phaseTouchedObstacle = true;
+            phaseEnteredObstacle = true;
             if (phasedObstacle == null)
             {
                 phasedObstacle = FindCurrentObstacle();
             }
+            return;
+        }
+
+        if (!phaseEnteredObstacle)
+        {
+            // Just entered phase near an edge: wait until it actually goes into obstacle volume.
+            if (HasObstacleAhead(GetPhaseProbeDistance()))
+            {
+                return;
+            }
+
+            if (phaseTimer > 0f)
+            {
+                return;
+            }
+
+            StopPhasing(true);
             return;
         }
 
@@ -386,7 +409,8 @@ public class InsectAI : EnemyAI
         }
 
         isPhasing = true;
-        phaseTouchedObstacle = true;
+        phaseEnteredObstacle = IsOverlappingObstacle();
+        phaseTouchedObstacle = phaseEnteredObstacle;
         phaseTimer = minimumPhaseDuration;
         if (phasedObstacle == null)
         {
@@ -420,6 +444,7 @@ public class InsectAI : EnemyAI
 
         isPhasing = false;
         phaseTouchedObstacle = false;
+        phaseEnteredObstacle = false;
         if (bodyCollider != null)
         {
             bodyCollider.isTrigger = false;
@@ -437,6 +462,7 @@ public class InsectAI : EnemyAI
     {
         isPhasing = false;
         phaseTouchedObstacle = false;
+        phaseEnteredObstacle = false;
 
         if (bodyCollider != null)
         {
@@ -635,6 +661,25 @@ public class InsectAI : EnemyAI
         return hit != null;
     }
 
+    private bool HasObstacleAhead(float distance)
+    {
+        if (bodyCollider == null || moveInput.sqrMagnitude <= 0.0001f)
+        {
+            return false;
+        }
+
+        Bounds bounds = bodyCollider.bounds;
+        Vector2 direction = moveInput.normalized;
+        RaycastHit2D hit = Physics2D.BoxCast(bounds.center, bounds.size * 0.9f, 0f, direction, Mathf.Max(0.02f, distance), GetObstacleCheckMask());
+        return hit.collider != null;
+    }
+
+    private float GetPhaseProbeDistance()
+    {
+        float speed = controller != null ? controller.MoveSpeed * moveSpeedMultiplier : 1f;
+        return Mathf.Max(0.12f, speed * Time.deltaTime * 2f);
+    }
+
     private Collider2D FindCurrentObstacle()
     {
         if (bodyCollider == null)
@@ -670,28 +715,19 @@ public class InsectAI : EnemyAI
             return false;
         }
 
-        MCController player = target.GetComponent<MCController>();
+        MCController player = target.GetComponentInParent<MCController>();
         if (player == null)
         {
             return false;
         }
 
         hasHitPlayer = true;
-        bool isDead = controller.CollideDamage >= player.CurrentHealth;
-        player.ApplyDamageAndStun(controller.CollideDamage, controller.stunDuration);
 
-        Rigidbody2D playerRb = target.GetComponent<Rigidbody2D>();
-        if (playerRb != null && !isDead)
+        // Route contact damage through EnemyController so collidedamage/knockback
+        // and single-frame dedupe logic stay consistent.
+        if (controller != null)
         {
-            Vector2 direction = (target.transform.position - transform.position).normalized;
-            if (direction.y <= 0.2f)
-            {
-                direction.y = 0.8f;
-            }
-
-            direction = direction.normalized;
-            playerRb.velocity = Vector2.zero;
-            playerRb.AddForce(direction * controller.knockbackForce, ForceMode2D.Impulse);
+            controller.ApplyContactDamage(target, transform.position);
         }
 
         SelfDestruct();
