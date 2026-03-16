@@ -16,6 +16,7 @@ public class Pickup : MonoBehaviour
     {
         if (collision.gameObject.GetComponent<MCController>() != null)
         {
+            AudioMaster.instance?.PlayInteract();
             PickupEffect();
             Destroy(gameObject);
         }

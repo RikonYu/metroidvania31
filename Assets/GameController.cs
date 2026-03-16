@@ -118,18 +118,32 @@ public class GameController : MonoBehaviour
     {
         HashSet<GameObject> spawnerManagedEnemies = GetAllSpawnerManagedEnemies();
 
-        foreach (var i in AllEnemies)
+        for (int i = AllEnemies.Count - 1; i >= 0; i--)
         {
-            if (ShouldSkipEnemyForGlobalReset(i, spawnerManagedEnemies))
+            EnemyController enemy = AllEnemies[i];
+            if (enemy == null)
+            {
+                AllEnemies.RemoveAt(i);
+                continue;
+            }
+
+            if (enemy.DestroyOnEncounterReset)
+            {
+                DestroyRuntimeEnemy(enemy);
+                continue;
+            }
+
+            if (ShouldSkipEnemyForGlobalReset(enemy, spawnerManagedEnemies))
             {
                 continue;
             }
 
-            i.gameObject.SetActive(true);
-            i.Respawn();
+            enemy.gameObject.SetActive(true);
+            enemy.Respawn();
         }
 
         mc.CurrentHealth = mc.MaxHealth;
+        mc.CurrentEnergy = mc.MaxEnergy;
     }
 
     private bool ShouldSkipEnemyForGlobalReset(EnemyController enemy, HashSet<GameObject> spawnerManagedEnemies)
@@ -367,6 +381,24 @@ public class GameController : MonoBehaviour
         }
     }
 
+    private void DestroyRuntimeEnemy(EnemyController enemy)
+    {
+        if (enemy == null)
+        {
+            return;
+        }
+
+        Room ownerRoom = enemy.GetComponentInParent<Room>(true);
+        if (ownerRoom != null && ownerRoom.Enemies != null)
+        {
+            ownerRoom.Enemies.Remove(enemy);
+        }
+
+        AllEnemies.Remove(enemy);
+        enemy.gameObject.SetActive(false);
+        Destroy(enemy.gameObject);
+    }
+
     private IEnumerator FadeBlack(float from, float to, float duration)
     {
         UIController ui = UIController.instance;
@@ -443,6 +475,33 @@ public class GameController : MonoBehaviour
     {
         EnsurePlayerInsideClosedDoors(room);
     }
+
+    public void OnBossDefeated(EnemyController boss)
+    {
+        if (boss == null)
+        {
+            return;
+        }
+
+        UIController.instance?.HideBossHP();
+
+        Room ownerRoom = ResolveBossRoom(boss);
+        if (ownerRoom != null && ownerRoom.BossBound != null)
+        {
+            ownerRoom.BossBound.SetActive(false);
+        }
+
+        if (ownerRoom != null && bossLockedDoorRoom == ownerRoom)
+        {
+            OpenBossLockedDoors();
+            return;
+        }
+
+        if (ownerRoom != null && ownerRoom == ActiveRoom)
+        {
+            OpenDoorsInRoom(ownerRoom);
+        }
+    }
     private void LateUpdate()
     {
         if (ActiveRoom == null || mc == null || mainCam == null) return;
@@ -486,6 +545,15 @@ public class GameController : MonoBehaviour
         bullet.gameObject.SetActive(true);
         bullet.Init(isEnemy, dir);
         activeBullets.Add(bullet);
+
+        if (isEnemy)
+        {
+            if (!(bullet is LaserBullet))
+            {
+                AudioMaster.instance?.PlayEnemyBullet();
+            }
+        }
+
         return bullet;
     }
 
@@ -814,7 +882,7 @@ public class GameController : MonoBehaviour
         bossLockedDoorRoom = room;
         bossClosedDoors.Clear();
 
-        Door[] doors = room.GetComponentsInChildren<Door>(true);
+        Door[] doors = GetDoorsOwnedByRoom(room);
         for (int i = 0; i < doors.Length; i++)
         {
             Door door = doors[i];
@@ -1020,7 +1088,7 @@ public class GameController : MonoBehaviour
             return colliders;
         }
 
-        Door[] doors = room.GetComponentsInChildren<Door>(true);
+        Door[] doors = GetDoorsOwnedByRoom(room);
         for (int i = 0; i < doors.Length; i++)
         {
             Door door = doors[i];
@@ -1151,11 +1219,18 @@ public class GameController : MonoBehaviour
             return;
         }
 
-        for (int i = 0; i < room.Enemies.Count; i++)
+        for (int i = room.Enemies.Count - 1; i >= 0; i--)
         {
             EnemyController enemy = room.Enemies[i];
             if (enemy == null)
             {
+                room.Enemies.RemoveAt(i);
+                continue;
+            }
+
+            if (enemy.DestroyOnEncounterReset)
+            {
+                DestroyRuntimeEnemy(enemy);
                 continue;
             }
 
@@ -1184,7 +1259,7 @@ public class GameController : MonoBehaviour
             return;
         }
 
-        Door[] doors = room.GetComponentsInChildren<Door>(true);
+        Door[] doors = GetDoorsOwnedByRoom(room);
         for (int i = 0; i < doors.Length; i++)
         {
             if (doors[i] != null)
@@ -1192,6 +1267,63 @@ public class GameController : MonoBehaviour
                 doors[i].Open();
             }
         }
+    }
+
+    private Door[] GetDoorsOwnedByRoom(Room room)
+    {
+        if (room == null)
+        {
+            return System.Array.Empty<Door>();
+        }
+
+        Door[] candidates = room.GetComponentsInChildren<Door>(true);
+        List<Door> ownedDoors = new List<Door>(candidates.Length);
+        for (int i = 0; i < candidates.Length; i++)
+        {
+            Door door = candidates[i];
+            if (door == null)
+            {
+                continue;
+            }
+
+            Room nearestOwner = door.GetComponentInParent<Room>(true);
+            if (nearestOwner == room)
+            {
+                ownedDoors.Add(door);
+            }
+        }
+
+        return ownedDoors.ToArray();
+    }
+
+    private Room ResolveBossRoom(EnemyController boss)
+    {
+        if (boss == null)
+        {
+            return null;
+        }
+
+        Room parentRoom = boss.GetComponentInParent<Room>(true);
+        if (parentRoom != null && parentRoom.Enemies != null && parentRoom.Enemies.Contains(boss))
+        {
+            return parentRoom;
+        }
+
+        for (int i = 0; i < Rooms.Count; i++)
+        {
+            Room room = Rooms[i];
+            if (room == null || room.Enemies == null)
+            {
+                continue;
+            }
+
+            if (room.Enemies.Contains(boss))
+            {
+                return room;
+            }
+        }
+
+        return parentRoom;
     }
 
     private void InvokeEncounterReset(GameObject root)

@@ -17,6 +17,7 @@ public class EnemyController : MonoBehaviour
     bool IsDead;
     public bool IsBoss;
     public bool CombatEnabled = true;
+    [SerializeField] private bool destroyOnEncounterReset;
     EnemyAI AI;
 
     // --- 新增：闪光效果所需变量 ---
@@ -34,6 +35,7 @@ public class EnemyController : MonoBehaviour
     private float freezeTimer;
 
     public bool IsFrozen => freezeTimer > 0f;
+    public bool DestroyOnEncounterReset => destroyOnEncounterReset;
 
     private void Awake()
     {
@@ -117,12 +119,22 @@ public class EnemyController : MonoBehaviour
             Shaker.instance.ShakeBossDefeat();
         }
 
+        if (IsBoss && GameController.instance != null)
+        {
+            GameController.instance.OnBossDefeated(this);
+        }
+
         gameObject.SetActive(false);
     }
 
     public void SetCombatEnabled(bool enabled)
     {
         CombatEnabled = enabled;
+    }
+
+    public void MarkAsRuntimeSpawned()
+    {
+        destroyOnEncounterReset = true;
     }
 
     public void Hurt(float dmg)

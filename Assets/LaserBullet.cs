@@ -15,6 +15,7 @@ public class LaserBullet : Bullet
     private Rigidbody2D body;
     private EnemyController ownerController;
     private float remainingDuration;
+    private bool enemyLaserAudioRegistered;
 
     private void Awake()
     {
@@ -50,6 +51,7 @@ public class LaserBullet : Bullet
         ownerController = isenemy ? FindOwnerController() : null;
         ConfigureBeams();
         SetLayerRecursively(gameObject, isenemy ? "EnemyBullet" : "MyBullet");
+        SyncEnemyLaserAudioRegistration();
     }
 
     public void SetDuration(float duration)
@@ -88,6 +90,7 @@ public class LaserBullet : Bullet
 
     private void OnDisable()
     {
+        UnregisterEnemyLaserAudio();
         for (int i = 0; i < beams.Count; i++)
         {
             if (beams[i] != null)
@@ -95,6 +98,11 @@ public class LaserBullet : Bullet
                 beams[i].gameObject.SetActive(false);
             }
         }
+    }
+
+    private void OnDestroy()
+    {
+        UnregisterEnemyLaserAudio();
     }
 
     private void CacheTemplate()
@@ -251,5 +259,31 @@ public class LaserBullet : Bullet
         {
             children[i].gameObject.layer = layer;
         }
+    }
+
+    private void SyncEnemyLaserAudioRegistration()
+    {
+        if (IsEnemy)
+        {
+            if (!enemyLaserAudioRegistered)
+            {
+                AudioMaster.instance?.StartEnemyLaserBeam();
+                enemyLaserAudioRegistered = true;
+            }
+            return;
+        }
+
+        UnregisterEnemyLaserAudio();
+    }
+
+    private void UnregisterEnemyLaserAudio()
+    {
+        if (!enemyLaserAudioRegistered)
+        {
+            return;
+        }
+
+        enemyLaserAudioRegistered = false;
+        AudioMaster.instance?.StopEnemyLaserBeam();
     }
 }

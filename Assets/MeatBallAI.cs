@@ -194,6 +194,12 @@ public class MetaBallAI : EnemyAI
             }
 
             GameObject spawned = Instantiate(InsectPrefab, transform.position, Quaternion.identity, parent);
+            EnemyController spawnedController = spawned.GetComponent<EnemyController>();
+            if (spawnedController != null)
+            {
+                spawnedController.MarkAsRuntimeSpawned();
+            }
+
             MetaBallInsectLaunch launch = spawned.GetComponent<MetaBallInsectLaunch>();
             if (launch == null)
             {

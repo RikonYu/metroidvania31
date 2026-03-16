@@ -124,11 +124,11 @@ MonoBehaviour:
   IsEnemy: 0
   Speed: 15
   Damage: 15
-  Duration: 1
+  Duration: 5
   CoolDown: 2
   MaxBounceCount: 0
   MinSpeedThreshold: 1
-  EnergyCost: 5
+  EnergyCost: 15
   PoolKey: 
   MaxChargeTime: 1
 --- !u!95 &659104737857485755

@@ -80,6 +80,8 @@ public class MCController : MonoBehaviour
     [Header("Respawn System")]
     [SerializeField] private Vector2 respawnOffset = new Vector2(0f, 0.5f);
     [SerializeField] private float safeSlopeThreshold = 0.5f;
+    [SerializeField] private float unsafeTrapCheckHeight = 1.5f;
+    [SerializeField] private float unsafeTrapCheckWidth = 0.8f;
 
     private Vector2 slopeNormal;
     private bool isOnSlope;
@@ -102,6 +104,8 @@ public class MCController : MonoBehaviour
     private bool wasFallingLastStep;
     private float inheritedFallDirection;
     private bool fallDirectionChanged;
+    private Trap[] cachedTraps;
+    private DeathTrap[] cachedDeathTraps;
 
     float freezeCounter;
     float slidetime;
@@ -159,6 +163,8 @@ public class MCController : MonoBehaviour
         CurrentHealth = MaxHealth;
         CurrentEnergy = MaxEnergy;
         UIController.instance.SetHP(CurrentHealth, MaxHealth);
+        UIController.instance.SetEnergy(CurrentEnergy, MaxEnergy);
+        RefreshTrapCaches();
 
         InitializeWeaponSlots();
 
@@ -224,7 +230,7 @@ public class MCController : MonoBehaviour
 
             if (Input.GetMouseButtonDown(0) && CurrentEnergy >= energyCost && firecd <= 0f)
             {
-                isCharging = true;
+                SetChargingState(true);
                 currentChargeTime = 0f;
             }
 
@@ -239,14 +245,17 @@ public class MCController : MonoBehaviour
 
             if (Input.GetMouseButtonUp(0) && isCharging)
             {
-                isCharging = false;
+                SetChargingState(false);
                 FireChargeWeapon(currentChargeTime, cbScript.MaxChargeTime, energyCost);
                 canRecover = false;
             }
         }
         else
         {
-            if (isCharging) isCharging = false;
+            if (isCharging)
+            {
+                SetChargingState(false);
+            }
 
             if (isFiringInput && firecd <= 0f && CurrentEnergy >= energyCost)
             {
@@ -296,6 +305,14 @@ public class MCController : MonoBehaviour
             fireDirection = Quaternion.Euler(0f, 0f, randomOffset) * fireDirection;
         }
 
+        bool isFlame = BulletPrefab != null && BulletPrefab.GetComponent<FlameBullet>() != null;
+        bool isIce = BulletPrefab != null && BulletPrefab.GetComponent<IceBullet>() != null;
+        bool isCharge = BulletPrefab != null && BulletPrefab.GetComponent<ChargeBullet>() != null;
+        if (!isCharge && (isIce || !isFlame))
+        {
+            AudioMaster.instance?.PlayBullet();
+        }
+
         GameController.instance.FireBullet(BulletPrefab, startPos, fireDirection, false);
     }
 
@@ -310,6 +327,7 @@ public class MCController : MonoBehaviour
         {
             Shaker.instance.ShakeChargeShot(ratio);
         }
+        AudioMaster.instance?.PlayChargeRelease();
 
         Vector3 worldPosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
         worldPosition.z = 0;
@@ -401,6 +419,7 @@ public class MCController : MonoBehaviour
         {
             handup.SetActive(false);
             handdown.SetActive(true);
+            SetChargingState(false);
             UpdateAnimationParameters();
             return;
         }
@@ -408,7 +427,7 @@ public class MCController : MonoBehaviour
         if (IsMinimapOpen())
         {
             horizontalInput = 0f;
-            isCharging = false;
+            SetChargingState(false);
             handup.SetActive(false);
             handdown.SetActive(true);
 
@@ -458,6 +477,7 @@ public class MCController : MonoBehaviour
 
             if (GameController.instance.CanSlide && Input.GetKeyDown(KeyCode.Q) && !isSliding && slideCooldownCounter <= 0f && !isClimbing)
             {
+                AudioMaster.instance?.PlayDash();
                 StartCoroutine(SlideRoutine());
             }
 
@@ -619,7 +639,6 @@ public class MCController : MonoBehaviour
 
     private IEnumerator DropDownRoutine(Collider2D platformCollider)
     {
-        Debug.Log($"dropping, {playerCollider}, {platformCollider}");
         if (playerCollider == null || platformCollider == null) yield break;
         isDroppingDown = true;
         Physics2D.IgnoreCollision(playerCollider, platformCollider, true);
@@ -928,7 +947,14 @@ public class MCController : MonoBehaviour
             {
                 if (hit.normal.y > safeSlopeThreshold)
                 {
-                    lastSafePosition = hit.point + respawnOffset;
+                    Vector2 baseSafePosition = BuildSafePositionFromGroundHit(hit);
+                    if (HasUnsafeTrapAbove(baseSafePosition))
+                    {
+                        return;
+                    }
+
+                    Vector2 nonOverlapping = ResolveNonOverlappingPosition(baseSafePosition);
+                    lastSafePosition = new Vector3(nonOverlapping.x, nonOverlapping.y, transform.position.z);
                 }
             }
         }
@@ -936,23 +962,194 @@ public class MCController : MonoBehaviour
 
     public void Respawn(bool isDropped)
     {
+        StopAllCoroutines();
         SetControlLocked(false);
         firecd = 0f;
         rb.velocity = Vector2.zero;
         isStunned = false;
         isClimbing = false;
-        if (isSliding) isSliding = false;
+        isSliding = false;
+        isDroppingDown = false;
+        RestoreDefaultColliderShape();
 
         if (isDropped)
-            transform.position = lastSafePosition;
+        {
+            transform.position = ResolveSafeRespawnPosition(lastSafePosition);
+        }
         else
         {
-            CurrentHealth = MaxHealth;
-            transform.position = GameController.instance.LastCamp.transform.position;
-            UIController.instance.SetHP(CurrentHealth, MaxHealth);
+            Vector3 respawnPos = transform.position;
+            if (GameController.instance != null && GameController.instance.LastCamp != null)
+            {
+                respawnPos = GameController.instance.LastCamp.transform.position;
+            }
+
+            transform.position = respawnPos;
         }
 
+        CurrentHealth = MaxHealth;
+        CurrentEnergy = MaxEnergy;
+        UIController.instance.SetHP(CurrentHealth, MaxHealth);
+        UIController.instance.SetEnergy(CurrentEnergy, MaxEnergy);
+
         UpdateAnimationParameters();
+    }
+
+    private Vector2 BuildSafePositionFromGroundHit(RaycastHit2D hit)
+    {
+        Vector2 normal = hit.normal.sqrMagnitude > 0.0001f ? hit.normal.normalized : Vector2.up;
+        float halfHeight = GetPlayerHalfHeight();
+        return hit.point + normal * (halfHeight + 0.02f) + respawnOffset;
+    }
+
+    private Vector3 ResolveSafeRespawnPosition(Vector3 desiredPosition)
+    {
+        Vector2 nonOverlapping = ResolveNonOverlappingPosition(new Vector2(desiredPosition.x, desiredPosition.y));
+        return new Vector3(nonOverlapping.x, nonOverlapping.y, desiredPosition.z);
+    }
+
+    private Vector2 ResolveNonOverlappingPosition(Vector2 startPosition)
+    {
+        Vector2 candidate = startPosition;
+        Vector2 checkSize = GetRespawnCheckSize();
+        LayerMask solidMask = GetRespawnSolidMask();
+        if (solidMask.value == 0)
+        {
+            return candidate;
+        }
+
+        const int maxSteps = 48;
+        const float stepHeight = 0.05f;
+        for (int i = 0; i < maxSteps; i++)
+        {
+            Collider2D hit = Physics2D.OverlapBox(candidate, checkSize, 0f, solidMask);
+            if (hit == null)
+            {
+                return candidate;
+            }
+
+            candidate += Vector2.up * stepHeight;
+        }
+
+        return candidate;
+    }
+
+    private Vector2 GetRespawnCheckSize()
+    {
+        if (playerCollider == null)
+        {
+            return new Vector2(0.8f, 1.6f);
+        }
+
+        Bounds bounds = playerCollider.bounds;
+        return new Vector2(
+            Mathf.Max(0.1f, bounds.size.x * 0.9f),
+            Mathf.Max(0.1f, bounds.size.y * 0.9f));
+    }
+
+    private LayerMask GetRespawnSolidMask()
+    {
+        LayerMask mask = groundLayer;
+        if (safeGroundLayer.value != 0)
+        {
+            mask |= safeGroundLayer;
+        }
+
+        return mask;
+    }
+
+    private float GetPlayerHalfHeight()
+    {
+        if (playerCollider == null)
+        {
+            return 0.5f;
+        }
+
+        return Mathf.Max(0.05f, playerCollider.bounds.extents.y);
+    }
+
+    private void RefreshTrapCaches()
+    {
+        cachedTraps = FindObjectsOfType<Trap>(true);
+        cachedDeathTraps = FindObjectsOfType<DeathTrap>(true);
+    }
+
+    private bool HasUnsafeTrapAbove(Vector2 safePosition)
+    {
+        if ((cachedTraps == null || cachedTraps.Length == 0)
+            && (cachedDeathTraps == null || cachedDeathTraps.Length == 0))
+        {
+            RefreshTrapCaches();
+        }
+
+        Vector2 respawnSize = GetRespawnCheckSize();
+        float halfWidth = Mathf.Max(0.05f, Mathf.Max(unsafeTrapCheckWidth, respawnSize.x) * 0.5f);
+        float minY = safePosition.y + 0.1f;
+        float maxY = safePosition.y + Mathf.Max(0.2f, unsafeTrapCheckHeight);
+
+        if (IsTrapArrayBlockingSafePoint(cachedTraps, safePosition, halfWidth, minY, maxY))
+        {
+            return true;
+        }
+
+        if (IsTrapArrayBlockingSafePoint(cachedDeathTraps, safePosition, halfWidth, minY, maxY))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool IsTrapArrayBlockingSafePoint<T>(T[] traps, Vector2 safePosition, float halfWidth, float minY, float maxY) where T : Component
+    {
+        if (traps == null)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < traps.Length; i++)
+        {
+            T trap = traps[i];
+            if (trap == null)
+            {
+                continue;
+            }
+
+            GameObject trapObject = trap.gameObject;
+            if (!trapObject.activeInHierarchy)
+            {
+                continue;
+            }
+
+            Vector3 trapPos = trapObject.transform.position;
+            if (Mathf.Abs(trapPos.x - safePosition.x) > halfWidth)
+            {
+                continue;
+            }
+
+            if (trapPos.y >= minY && trapPos.y <= maxY)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void RestoreDefaultColliderShape()
+    {
+        if (playerCollider is BoxCollider2D box)
+        {
+            box.size = origColliderSize;
+            box.offset = origColliderOffset;
+            return;
+        }
+
+        if (playerCollider is CapsuleCollider2D cap)
+        {
+            cap.size = origColliderSize;
+            cap.offset = origColliderOffset;
+        }
     }
 
     public void AcquireWeapon(GameObject bulletPrefab)
@@ -967,6 +1164,7 @@ public class MCController : MonoBehaviour
 
         CurrentHealth -= dmg;
         if (CurrentHealth <= 0f) CurrentHealth = 0f;
+        AudioMaster.instance?.PlayHurt();
 
         if (Shaker.instance != null)
         {
@@ -1001,6 +1199,7 @@ public class MCController : MonoBehaviour
         {
             Shaker.instance.ShakeMaxSpeedLanding(impactSpeed, maxFallSpeed);
         }
+        AudioMaster.instance?.PlayFall();
 
         hardLandingShakeTimer = hardLandingShakeCooldown;
     }
@@ -1036,6 +1235,7 @@ public class MCController : MonoBehaviour
 
         bool isWalking = isGrounded && !isSliding && !isClimbing && !isStunned && freezeCounter <= 0f && Mathf.Abs(horizontalInput) > 0.01f;
         float verticalSpeed = (isGrounded || isClimbing || rb == null) ? 0f : rb.velocity.y;
+        AudioMaster.instance?.SetPlayerWalking(isWalking);
 
         spriteAnimator.SetBool("IsWalking", isWalking);
         spriteAnimator.SetFloat("Vspeed", verticalSpeed);
@@ -1242,7 +1442,7 @@ public class MCController : MonoBehaviour
         {
             lockedGravityScale = rb != null ? rb.gravityScale : 0f;
             horizontalInput = 0f;
-            isCharging = false;
+            SetChargingState(false);
             firecd = Mathf.Max(0f, firecd);
 
             if (isClimbing)
@@ -1265,10 +1465,34 @@ public class MCController : MonoBehaviour
         }
     }
 
+    private void SetChargingState(bool charging)
+    {
+        if (isCharging == charging)
+        {
+            return;
+        }
+
+        isCharging = charging;
+        if (charging)
+        {
+            AudioMaster.instance?.StartChargingLoop();
+        }
+        else
+        {
+            AudioMaster.instance?.StopChargingLoop();
+        }
+    }
+
     private bool IsMinimapOpen()
     {
         return UIController.instance != null
             && UIController.instance.MinimapBG != null
             && UIController.instance.MinimapBG.activeSelf;
+    }
+
+    private void OnDisable()
+    {
+        SetChargingState(false);
+        AudioMaster.instance?.SetPlayerWalking(false);
     }
 }

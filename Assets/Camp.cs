@@ -55,6 +55,16 @@ public class Camp : Interactable
     {
         GameController.instance.LastCamp = this;
         IsVisited = true;
+        AudioMaster.instance?.PlayInteract();
+        MCController mc = GameController.instance != null ? GameController.instance.mc : null;
+        if (mc != null)
+        {
+            mc.CurrentHealth = mc.MaxHealth;
+            mc.CurrentEnergy = mc.MaxEnergy;
+            UIController.instance?.SetHP(mc.CurrentHealth, mc.MaxHealth);
+            UIController.instance?.SetEnergy(mc.CurrentEnergy, mc.MaxEnergy);
+        }
+
         anim.SetTrigger("save");
         infoObject.SetActive(false);
     }

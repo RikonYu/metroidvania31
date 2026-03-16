@@ -109,6 +109,7 @@ MonoBehaviour:
   wm: {fileID: 0}
   IsBoss: 1
   CombatEnabled: 1
+  destroyOnEncounterReset: 0
   flashDuration: 0.15
   flashColor: {r: 1, g: 1, b: 1, a: 1}
 --- !u!114 &6136014292107427388
@@ -143,11 +144,13 @@ MonoBehaviour:
   searchWaitTime: 2
   LaunchPrefab: {fileID: 163069815059962610, guid: 4fc9c0407875e3144815f7ec749ea0ac, type: 3}
   InsectPrefab: {fileID: 163069815059962610, guid: 67723c7cc803e1147a3a46ec3578f313, type: 3}
-  state1LaunchInterval: 2.5
-  state2BurstInterval: 1.5
+  state1LaunchInterval: 4.5
+  launchEnemyFlyDuration: 0.8
+  launchEnemyFallbackSpeed: 8
+  state2BurstInterval: 2
   hurtBurstCooldown: 1.5
   revealStepInterval: 1.2
-  revealDuration: 8
+  revealDuration: 120
 --- !u!1 &163069816326980511
 GameObject:
   m_ObjectHideFlags: 0

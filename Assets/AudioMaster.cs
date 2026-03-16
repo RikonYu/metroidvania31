@@ -10,16 +10,20 @@ public class AudioMaster : MonoBehaviour
     public Dictionary<string, AudioClip> audios = new Dictionary<string, AudioClip>();
 
     [Header("Walk Settings")]
-    [SerializeField] private float walkInterval = 0.3f;
     [SerializeField] private Vector2 walkPitchRange = new Vector2(0.94f, 1.06f);
 
     [Header("Bullet Settings")]
     [SerializeField] private Vector2 bulletPitchRange = new Vector2(0.95f, 1.08f);
+    [SerializeField] private float enemyBulletMinInterval = 0.05f;
 
     private AudioSource oneShotSource;
     private AudioSource chargingLoopSource;
+    private AudioSource walkLoopSource;
+    private AudioSource enemyLaserLoopSource;
     private bool isPlayerWalking;
-    private float walkTimer;
+    private float lastEnemyBulletPlayTime = -100f;
+    private int lastEnemyBulletPlayFrame = -1;
+    private int enemyLaserLoopCount;
 
     void Awake()
     {
@@ -34,23 +38,6 @@ public class AudioMaster : MonoBehaviour
         EnsureAudioSources();
     }
 
-    void Update()
-    {
-        if (!isPlayerWalking)
-        {
-            return;
-        }
-
-        walkTimer -= Time.deltaTime;
-        if (walkTimer > 0f)
-        {
-            return;
-        }
-
-        PlayWithRandomPitch("walk", walkPitchRange);
-        walkTimer = Mathf.Max(0.05f, walkInterval);
-    }
-
     public void SetPlayerWalking(bool walking)
     {
         if (isPlayerWalking == walking)
@@ -61,7 +48,11 @@ public class AudioMaster : MonoBehaviour
         isPlayerWalking = walking;
         if (walking)
         {
-            walkTimer = 0f;
+            StartWalkLoop();
+        }
+        else
+        {
+            StopWalkLoop();
         }
     }
 
@@ -78,6 +69,65 @@ public class AudioMaster : MonoBehaviour
     public void PlayBullet()
     {
         PlayWithRandomPitch("bullet", bulletPitchRange);
+    }
+
+    public void PlayEnemyBullet()
+    {
+        if (lastEnemyBulletPlayFrame == Time.frameCount)
+        {
+            return;
+        }
+
+        if (Time.unscaledTime - lastEnemyBulletPlayTime < Mathf.Max(0f, enemyBulletMinInterval))
+        {
+            return;
+        }
+
+        lastEnemyBulletPlayFrame = Time.frameCount;
+        lastEnemyBulletPlayTime = Time.unscaledTime;
+        Play("enemybullet");
+    }
+
+    public void StartEnemyLaserBeam()
+    {
+        EnsureAudioSources();
+        enemyLaserLoopCount++;
+
+        AudioClip laser = GetAudio("laserbeam");
+        if (laser == null || enemyLaserLoopSource == null)
+        {
+            return;
+        }
+
+        if (enemyLaserLoopSource.isPlaying && enemyLaserLoopSource.clip == laser)
+        {
+            return;
+        }
+
+        enemyLaserLoopSource.Stop();
+        enemyLaserLoopSource.pitch = 1f;
+        enemyLaserLoopSource.clip = laser;
+        enemyLaserLoopSource.loop = true;
+        enemyLaserLoopSource.Play();
+    }
+
+    public void StopEnemyLaserBeam()
+    {
+        if (enemyLaserLoopCount > 0)
+        {
+            enemyLaserLoopCount--;
+        }
+
+        if (enemyLaserLoopCount > 0)
+        {
+            return;
+        }
+
+        enemyLaserLoopCount = 0;
+        if (enemyLaserLoopSource != null && enemyLaserLoopSource.isPlaying)
+        {
+            enemyLaserLoopSource.Stop();
+        }
     }
 
     public void PlayChargeRelease()
@@ -173,6 +223,22 @@ public class AudioMaster : MonoBehaviour
             chargingLoopSource.loop = true;
             chargingLoopSource.spatialBlend = 0f;
         }
+
+        if (walkLoopSource == null)
+        {
+            walkLoopSource = gameObject.AddComponent<AudioSource>();
+            walkLoopSource.playOnAwake = false;
+            walkLoopSource.loop = true;
+            walkLoopSource.spatialBlend = 0f;
+        }
+
+        if (enemyLaserLoopSource == null)
+        {
+            enemyLaserLoopSource = gameObject.AddComponent<AudioSource>();
+            enemyLaserLoopSource.playOnAwake = false;
+            enemyLaserLoopSource.loop = true;
+            enemyLaserLoopSource.spatialBlend = 0f;
+        }
     }
 
     private AudioClip GetAudio(string key)
@@ -215,9 +281,48 @@ public class AudioMaster : MonoBehaviour
         oneShotSource.pitch = 1f;
     }
 
+    private void StartWalkLoop()
+    {
+        EnsureAudioSources();
+
+        AudioClip walk = GetAudio("walk");
+        if (walk == null || walkLoopSource == null)
+        {
+            return;
+        }
+
+        if (walkLoopSource.isPlaying && walkLoopSource.clip == walk)
+        {
+            return;
+        }
+
+        float minPitch = Mathf.Min(walkPitchRange.x, walkPitchRange.y);
+        float maxPitch = Mathf.Max(walkPitchRange.x, walkPitchRange.y);
+
+        walkLoopSource.Stop();
+        walkLoopSource.clip = walk;
+        walkLoopSource.pitch = Random.Range(minPitch, maxPitch);
+        walkLoopSource.loop = true;
+        walkLoopSource.Play();
+    }
+
+    private void StopWalkLoop()
+    {
+        if (walkLoopSource != null && walkLoopSource.isPlaying)
+        {
+            walkLoopSource.Stop();
+        }
+    }
+
     private void OnDisable()
     {
         StopChargingLoop();
+        StopWalkLoop();
+        if (enemyLaserLoopSource != null && enemyLaserLoopSource.isPlaying)
+        {
+            enemyLaserLoopSource.Stop();
+        }
+        enemyLaserLoopCount = 0;
         isPlayerWalking = false;
     }
 

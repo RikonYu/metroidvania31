@@ -207,6 +207,11 @@ public class NestAI : EnemyAI
         Vector3 spawnPosition = fireSpot != null ? fireSpot.position : transform.position;
         Transform parent = transform.parent;
         GameObject spawned = Object.Instantiate(insectPrefab, spawnPosition, Quaternion.identity, parent);
+        EnemyController spawnedController = spawned.GetComponent<EnemyController>();
+        if (spawnedController != null)
+        {
+            spawnedController.MarkAsRuntimeSpawned();
+        }
 
         InsectAI insectAI = spawned.GetComponent<InsectAI>();
         if (insectAI != null)

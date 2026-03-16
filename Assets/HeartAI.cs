@@ -365,6 +365,12 @@ public class HeartAI : EnemyAI, IEncounterResettable
             return;
         }
 
+        EnemyController spawnedController = spawned.GetComponent<EnemyController>();
+        if (spawnedController != null)
+        {
+            spawnedController.MarkAsRuntimeSpawned();
+        }
+
         MetaBallAI metaBall = spawned.GetComponent<MetaBallAI>();
         if (metaBall != null)
         {
@@ -403,6 +409,12 @@ public class HeartAI : EnemyAI, IEncounterResettable
         {
             Transform parent = transform.parent;
             GameObject spawned = Instantiate(InsectPrefab, transform.position, Quaternion.identity, parent);
+            EnemyController spawnedController = spawned.GetComponent<EnemyController>();
+            if (spawnedController != null)
+            {
+                spawnedController.MarkAsRuntimeSpawned();
+            }
+
             InsectAI insectAI = spawned.GetComponent<InsectAI>();
             if (insectAI == null)
             {
